@@ -9,6 +9,7 @@ and next-day plans only to the configured Gauntlet ledger.
 ```bash
 python -m controller.gauntlet_controller validate <run.json>
 python -m controller.gauntlet_controller validate <run.json> --operational
+python -m controller.gauntlet_controller today <run.json>
 python -m controller.gauntlet_controller cron-lines <run.json> --state-dir <dir>
 python -m controller.gauntlet_controller close-day <run.json> YYYY-MM-DD --state-dir <dir>
 python -m controller.gauntlet_controller close-auto <run.json> --state-dir <dir>
@@ -17,6 +18,11 @@ python -m controller.gauntlet_controller close-auto <run.json> --state-dir <dir>
 `cron-lines` prints, but does not install, the crontab entry. Installation is a separate
 explicit server action. `close-auto` grades the previous local date, allowing a midnight
 trigger to close the day that just ended.
+
+`today` is the learner-facing entry point. Before the run it previews Day 1; during the
+run it prints the frozen required boundary, proof requirements, mastery-note path,
+cutoff, and pre-midnight submission checklist. `today --day YYYY-MM-DD` previews a
+specific generated boundary.
 
 Adapters receive one JSON object on stdin and must return one JSON object on stdout.
 See `docs/run-contract.md`. Adapter failures exit with code 2 and an `INFRA_ERROR`

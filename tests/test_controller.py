@@ -19,6 +19,7 @@ from controller.gauntlet_controller import (
     invoke_adapter,
     normalize_grade,
     pin_remote,
+    today_view,
     validate_run,
 )
 
@@ -253,6 +254,15 @@ class ControllerTests(unittest.TestCase):
         config = json.loads((ROOT / "templates" / "run.json").read_text())
         self.assertTrue(automatic_freeze_window(config, dt.datetime(2026, 1, 2, 6, 2, tzinfo=dt.UTC)))
         self.assertFalse(automatic_freeze_window(config, dt.datetime(2026, 1, 2, 6, 15, tzinfo=dt.UTC)))
+
+    def test_today_previews_first_day_before_run(self) -> None:
+        config_path = ROOT / "runs" / "2026-07-15-tutoring-platform" / "run.json"
+        now = dt.datetime(2026, 7, 14, 18, tzinfo=dt.UTC)
+        rendered = today_view(config_path, now=now)
+        self.assertIn("Preview: Gauntlet Day 1", rendered)
+        self.assertIn("Required boundary: Foundation", rendered)
+        self.assertIn("Before midnight", rendered)
+        self.assertIn("2026-07-16 00:00 CDT", rendered)
 
 
 if __name__ == "__main__":

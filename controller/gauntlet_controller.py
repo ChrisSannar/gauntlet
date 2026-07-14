@@ -569,6 +569,50 @@ def automatic_freeze_window(config: dict[str, Any], now: dt.datetime | None = No
     return 0 <= elapsed < 300
 
 
+def today_view(
+    config_path: Path, day: dt.date | None = None, now: dt.datetime | None = None
+) -> str:
+    config = read_json(config_path)
+    validate_run(config, operational=True)
+    timezone = ZoneInfo(config["schedule"]["timezone"])
+    current = now.astimezone(timezone) if now else dt.datetime.now(timezone)
+    start = dt.date.fromisoformat(config["schedule"]["start_date"])
+    end = dt.date.fromisoformat(config["schedule"]["end_date"])
+    selected = day or current.date()
+    preview = False
+    if day is None and selected < start:
+        selected = start
+        preview = True
+    if not start <= selected <= end:
+        raise ControllerError(f"{selected} is outside configured run dates")
+
+    run_root = config_path.resolve().parent
+    day_dir = run_root / "days" / selected.isoformat()
+    plan = read_required(day_dir / "plan.md", "daily plan").rstrip()
+    mastery = day_dir / "mastery.md"
+    cutoff_hour, cutoff_minute = (
+        int(part) for part in config["schedule"]["cutoff_local_time"].split(":")
+    )
+    cutoff = dt.datetime.combine(
+        selected + dt.timedelta(days=1), dt.time(cutoff_hour, cutoff_minute), timezone
+    )
+    day_number = (selected - start).days + 1
+    heading = "Preview" if preview else "Today"
+    return (
+        f"# {heading}: Gauntlet Day {day_number} — {selected.isoformat()}\n\n"
+        f"Cutoff: {cutoff.strftime('%Y-%m-%d %H:%M %Z')}\n"
+        f"Product: {config['project']['remote']} ({config['project']['branch']})\n"
+        f"Mastery note: {mastery}\n\n"
+        f"{plan}\n\n"
+        "# Before midnight\n\n"
+        f"1. Commit and push product work to `{config['project']['branch']}`.\n"
+        f"2. Complete `{mastery}` with concrete evidence.\n"
+        f"3. Commit and push the mastery note to ledger `{config['ledger']['branch']}`.\n"
+        "4. Confirm both working trees are clean and tracking their remote branch.\n"
+        "5. Stop at the boundary; grading and tomorrow's plan run automatically.\n"
+    )
+
+
 def cron_lines(config_path: Path, state_dir: Path) -> str:
     config = read_json(config_path)
     validate_run(config)
@@ -627,6 +671,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     cron = subparsers.add_parser("cron-lines")
     cron.add_argument("config", type=Path)
     cron.add_argument("--state-dir", type=Path, required=True)
+
+    today = subparsers.add_parser("today")
+    today.add_argument("config", type=Path)
+    today.add_argument("--day", type=dt.date.fromisoformat)
     return parser.parse_args(argv)
 
 
@@ -660,6 +708,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"no-op: {day} outside run")
         elif args.operation == "cron-lines":
             print(cron_lines(args.config, args.state_dir), end="")
+        elif args.operation == "today":
+            print(today_view(args.config, args.day))
         return 0
     except ControllerError as exc:
         print(f"INFRA_ERROR: {exc}", file=sys.stderr)

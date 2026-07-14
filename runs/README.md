@@ -30,3 +30,6 @@ original.
 The learner may submit at most one appeal for a finalized daily report using
 `templates/daily-grade-appeal.md`. The appeal must itself be committed and pushed to
 the Gauntlet repository, identify one disputed claim, and cite only the frozen bundle.
+
+For the daily learner ritual, see [`docs/participating-in-a-run.md`](../docs/participating-in-a-run.md)
+and run `python -m controller.gauntlet_controller today <run.json>`.
