@@ -1,0 +1,9 @@
+[Unit]
+Description=Close the current Gauntlet day from frozen repository evidence
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/chrissannar/Practice/gauntlet
+ExecStart=/usr/bin/flock -n /home/chrissannar/.local/state/gauntlet/2026-07-15-tutoring-platform.lock /home/chrissannar/Practice/gauntlet/ops/run-local-controller.sh

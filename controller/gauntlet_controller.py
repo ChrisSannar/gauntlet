@@ -559,6 +559,16 @@ def automatic_day(config: dict[str, Any], now: dt.datetime | None = None) -> dt.
     return current.date() - dt.timedelta(days=1)
 
 
+def automatic_freeze_window(config: dict[str, Any], now: dt.datetime | None = None) -> bool:
+    """Only the cutoff invocation may create a freeze; scheduled retries must reuse it."""
+    timezone = ZoneInfo(config["schedule"]["timezone"])
+    current = now.astimezone(timezone) if now else dt.datetime.now(timezone)
+    hour, minute = (int(part) for part in config["schedule"]["cutoff_local_time"].split(":"))
+    cutoff = current.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    elapsed = (current - cutoff).total_seconds()
+    return 0 <= elapsed < 300
+
+
 def cron_lines(config_path: Path, state_dir: Path) -> str:
     config = read_json(config_path)
     validate_run(config)
@@ -638,8 +648,13 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(close_day(args.config, args.day, args.state_dir), indent=2, sort_keys=True))
         elif args.operation == "close-auto":
             config = read_json(args.config)
-            day = automatic_day(config)
+            now = dt.datetime.now(dt.UTC)
+            day = automatic_day(config, now)
             if date_in_run(config, day):
+                if not freeze_path(args.state_dir, config["run_id"], day).exists() and not automatic_freeze_window(
+                    config, now
+                ):
+                    raise ControllerError("original cutoff freeze is missing; retry cannot admit later heads")
                 print(json.dumps(close_day(args.config, day, args.state_dir), indent=2, sort_keys=True))
             else:
                 print(f"no-op: {day} outside run")

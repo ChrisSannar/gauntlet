@@ -11,6 +11,7 @@ from pathlib import Path
 from controller.gauntlet_controller import (
     ControllerError,
     automatic_day,
+    automatic_freeze_window,
     close_day,
     cron_lines,
     establish_freeze,
@@ -247,6 +248,11 @@ class ControllerTests(unittest.TestCase):
         config = json.loads((ROOT / "templates" / "run.json").read_text())
         now = dt.datetime(2026, 7, 14, 5, 1, tzinfo=dt.UTC)
         self.assertEqual(automatic_day(config, now), dt.date(2026, 7, 13))
+
+    def test_only_cutoff_attempt_can_create_automatic_freeze(self) -> None:
+        config = json.loads((ROOT / "templates" / "run.json").read_text())
+        self.assertTrue(automatic_freeze_window(config, dt.datetime(2026, 1, 2, 6, 2, tzinfo=dt.UTC)))
+        self.assertFalse(automatic_freeze_window(config, dt.datetime(2026, 1, 2, 6, 15, tzinfo=dt.UTC)))
 
 
 if __name__ == "__main__":

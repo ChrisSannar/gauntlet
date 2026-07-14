@@ -34,6 +34,6 @@ checks may still launch a repository-local Playwright application. Checks marked
 `infrastructure: true` convert provisioning/cache failures to `INFRA_ERROR` instead of
 learner failure.
 
-The server still needs Git credentials for the ledger, read access to the product, the
+The controller host still needs Git credentials for the ledger, read access to the product, the
 configured LLM adapter executables/secrets, offline dependency caches, and cron. A run remains draft until its
 `PENDING` values are replaced and `status` becomes `active`.
