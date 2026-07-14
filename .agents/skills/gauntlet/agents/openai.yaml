@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gauntlet"
+  short_description: "Run configurable AI accountability gauntlets"
+  default_prompt: "Use $gauntlet to configure or operate an evidence-driven accountability run for this project."

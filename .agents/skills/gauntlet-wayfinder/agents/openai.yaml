@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gauntlet Wayfinder"
+  short_description: "Check direction without issuing a grade"
+  default_prompt: "Use $gauntlet-wayfinder to check whether my current work is on track and identify the next best action."

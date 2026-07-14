@@ -1,0 +1,218 @@
+from __future__ import annotations
+
+import datetime as dt
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from controller.gauntlet_controller import (
+    ControllerError,
+    automatic_day,
+    close_day,
+    invoke_adapter,
+    normalize_grade,
+    pin_remote,
+    validate_run,
+)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class ControllerTests(unittest.TestCase):
+    def make_repo(self, root: Path, name: str) -> tuple[Path, Path]:
+        source = root / name
+        bare = root / f"{name}.git"
+        source.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=source, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=source, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=source, check=True)
+        subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+        subprocess.run(["git", "remote", "add", "origin", str(bare)], cwd=source, check=True)
+        return source, bare
+
+    def commit_and_push(self, source: Path, message: str) -> str:
+        subprocess.run(["git", "add", "."], cwd=source, check=True)
+        subprocess.run(["git", "commit", "-qm", message], cwd=source, check=True)
+        subprocess.run(["git", "push", "-q", "origin", "HEAD:refs/heads/main"], cwd=source, check=True)
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
+
+    def test_draft_template_validates(self) -> None:
+        config = json.loads((ROOT / "templates" / "run.json").read_text())
+        validate_run(config)
+
+    def test_pending_config_cannot_operate(self) -> None:
+        config = json.loads((ROOT / "templates" / "run.json").read_text())
+        config["status"] = "active"
+        with self.assertRaisesRegex(ControllerError, "PENDING"):
+            validate_run(config, operational=True)
+
+    def test_required_browser_cannot_be_disabled(self) -> None:
+        config = json.loads((ROOT / "templates" / "run.json").read_text())
+        config["verification"]["browser"]["required"] = True
+        with self.assertRaisesRegex(ControllerError, "cannot be disabled"):
+            validate_run(config)
+
+    def test_adapter_uses_json_stdin_stdout(self) -> None:
+        adapter = {
+            "command": [
+                sys.executable,
+                "-c",
+                "import json,sys; value=json.load(sys.stdin); json.dump({'seen': value['x']}, sys.stdout)",
+            ],
+            "timeout_seconds": 5,
+        }
+        self.assertEqual(invoke_adapter(adapter, {"x": 7}), {"seen": 7})
+
+    def test_invalid_adapter_output_is_infrastructure_error(self) -> None:
+        adapter = {
+            "command": [sys.executable, "-c", "print('not-json')"],
+            "timeout_seconds": 5,
+        }
+        with self.assertRaisesRegex(ControllerError, "invalid JSON"):
+            invoke_adapter(adapter, {})
+
+    def test_lower_of_two_is_controller_enforced(self) -> None:
+        grade = normalize_grade(
+            {
+                "delivery_score": 4,
+                "mastery_score": 2.5,
+                "overall_score": 4,
+                "overall_grade": "A",
+            }
+        )
+        self.assertEqual(grade["overall_score"], 2.5)
+        self.assertEqual(grade["overall_grade"], "C")
+
+    def test_scores_use_half_point_increments(self) -> None:
+        with self.assertRaisesRegex(ControllerError, "0.5 increments"):
+            normalize_grade({"delivery_score": 3.2, "mastery_score": 3})
+
+    def test_pin_remote_reads_branch_head(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            bare = root / "remote.git"
+            source.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=source, check=True)
+            (source / "README.md").write_text("test\n")
+            subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-qm", "test"], cwd=source, check=True)
+            expected = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
+            subprocess.run(["git", "clone", "-q", "--bare", str(source), str(bare)], check=True)
+            self.assertEqual(pin_remote(str(bare), "main"), expected)
+
+    def test_close_day_runs_full_transaction_and_pushes_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            product, product_remote = self.make_repo(root, "product")
+            (product / "app.txt").write_text("deployed product\n")
+            product_sha = self.commit_and_push(product, "product")
+
+            adapter = root / "adapter.py"
+            adapter.write_text(
+                "import json,sys\n"
+                "request=json.load(sys.stdin)\n"
+                "if request['operation']=='grade-day':\n"
+                " json.dump({'delivery_score':4,'mastery_score':3,'confidence':'high','summary':'good'},sys.stdout)\n"
+                "elif request['operation']=='plan-day':\n"
+                " json.dump({'plan_markdown':'# Daily Plan — next\\n'},sys.stdout)\n"
+                "else:\n"
+                " raise SystemExit(2)\n"
+            )
+
+            ledger, ledger_remote = self.make_repo(root, "ledger")
+            run_id = "integration-run"
+            run = {
+                "schema_version": 1,
+                "run_id": run_id,
+                "status": "active",
+                "ledger": {"remote": str(ledger_remote), "branch": "main"},
+                "project": {
+                    "name": "Test",
+                    "remote": str(product_remote),
+                    "branch": "main",
+                    "deployed_url": "https://example.test",
+                    "backlog_path": "projects/test/BACKLOG.md",
+                },
+                "schedule": {
+                    "timezone": "America/Chicago",
+                    "start_date": "2026-07-13",
+                    "end_date": "2026-07-14",
+                    "cutoff_local_time": "00:00",
+                    "target_focused_hours": 16,
+                },
+                "accountability": {
+                    "rubric_path": "docs/rubric.md",
+                    "mastery_template_path": "templates/mastery.md",
+                    "overall_rule": "lower-of-delivery-mastery",
+                    "consequence": {
+                        "mode": "none",
+                        "description": "test",
+                        "automatic_execution": False,
+                    },
+                    "publishing": {
+                        "mode": "disabled",
+                        "channels": [],
+                        "approval_required": True,
+                    },
+                },
+                "verification": {
+                    "commands": [
+                        {
+                            "id": "smoke",
+                            "command": [sys.executable, "-c", "from pathlib import Path; assert Path('app.txt').exists()"],
+                            "timeout_seconds": 10,
+                            "required": True,
+                        }
+                    ],
+                    "browser": {"enabled": False, "adapter": None, "required": False},
+                },
+                "adapters": {
+                    role: {"command": [sys.executable, str(adapter)], "timeout_seconds": 10}
+                    for role in ("grader", "planner", "appeal_judge")
+                },
+            }
+            (ledger / "runs" / run_id / "days" / "2026-07-13").mkdir(parents=True)
+            (ledger / "runs" / run_id / "run.json").write_text(json.dumps(run))
+            (ledger / "runs" / run_id / "days" / "2026-07-13" / "plan.md").write_text("# Plan\n")
+            (ledger / "runs" / run_id / "days" / "2026-07-13" / "mastery.md").write_text("# Mastery\n")
+            (ledger / "docs").mkdir()
+            (ledger / "docs" / "rubric.md").write_text("# Rubric\n")
+            (ledger / "templates").mkdir()
+            (ledger / "templates" / "mastery.md").write_text("# Mastery Template\n")
+            (ledger / "projects" / "test").mkdir(parents=True)
+            (ledger / "projects" / "test" / "BACKLOG.md").write_text("# Backlog\n")
+            self.commit_and_push(ledger, "ledger")
+
+            result = close_day(ledger / "runs" / run_id / "run.json", dt.date(2026, 7, 13), root / "state")
+            self.assertEqual(result["grade"]["overall_grade"], "B")
+            self.assertEqual(result["evidence"]["product_sha"], product_sha)
+
+            checkout = root / "ledger-check"
+            subprocess.run(
+                ["git", "clone", "-q", "--branch", "main", str(ledger_remote), str(checkout)], check=True
+            )
+            finalized = checkout / "runs" / run_id / "days" / "2026-07-13"
+            self.assertTrue((finalized / "evidence.json").exists())
+            self.assertTrue((finalized / "grade.json").exists())
+            self.assertTrue((checkout / "runs" / run_id / "days" / "2026-07-14" / "plan.md").exists())
+            self.assertEqual(pin_remote(str(product_remote), "main"), product_sha)
+            repeated = close_day(
+                ledger / "runs" / run_id / "run.json", dt.date(2026, 7, 13), root / "state"
+            )
+            self.assertEqual(repeated["status"], "already-finalized")
+
+    def test_automatic_day_is_previous_local_date(self) -> None:
+        config = json.loads((ROOT / "templates" / "run.json").read_text())
+        now = dt.datetime(2026, 7, 14, 5, 1, tzinfo=dt.UTC)
+        self.assertEqual(automatic_day(config, now), dt.date(2026, 7, 13))
+
+
+if __name__ == "__main__":
+    unittest.main()

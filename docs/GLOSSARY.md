@@ -36,3 +36,51 @@ Living document. Terms are added as they acquire a settled meaning during design
   server between OpenClaw and his machine; finished as part of Project 1 (ADR 0014).
 - **Ghostwriter / Course Forge / Drillmaster / Red Pen** — Projects 1–4 (see
   CURRICULUM.md).
+- **Accountability Pilot** — a consequence-free, time-boxed rehearsal before the full
+  Gauntlet. Its current run targets 40 focused hours over five days while using daily
+  results to calibrate the accountability system (ADR 0016).
+- **Daily Review** — an automatically triggered midnight assessment of a frozen day's
+  evidence. It runs whether or not Chris requests it and produces a durable result.
+- **Grade Runner** — the repository-owned, provider-neutral command invoked by an
+  external scheduler to collect evidence, run checks, request LLM judgment, and save
+  the daily review.
+- **Task Backlog** — the dependency-aware, difficulty-ranked pool from which daily
+  project work is selected. Tasks state their completion evidence so the grader can
+  judge them without inventing requirements after the fact.
+- **Adaptive Planner** — the component that uses completion quality, elapsed effort,
+  blockers, and prior grades to select or reshape later backlog work. It assigns work
+  but does not grade it.
+- **Required Boundary** — the frozen set of tasks whose evidence is graded for a given
+  day. Work outside it may inform difficulty calibration but cannot retroactively
+  redefine whether the day succeeded.
+- **Stretch Work** — backlog work pulled after crossing the day's required boundary.
+  It counts as real project progress and planning evidence but is not required to pass
+  the day on which it was pulled.
+- **Maintenance Work** — defects, regression coverage, refactoring, dependency upkeep,
+  and operational repairs. It competes with feature work in the same task backlog.
+- **Live Product Check** — an AI-driven browser review of the deployed product using a
+  pinned browser-access tool. It produces review evidence and complements E2E tests.
+- **E2E Gate** — deterministic browser automation that verifies critical user journeys
+  against the running application as part of daily grading.
+- **Evidence Cutoff** — midnight in the pilot's configured timezone, when the grade
+  runner pins the remote-reachable commit and closes the day's evidence window.
+- **Evidence Bundle** — the immutable inputs for one daily review: frozen plan, pinned
+  commit, test and E2E results, deployed-site browser evidence, and work log.
+- **Accountability Controller** — the externally scheduled service that closes the
+  evidence window, invokes the grade runner, persists the result, and freezes the next
+  plan without waiting for learner action.
+- **Mastery Note** — required learner-authored daily evidence stored in the Gauntlet
+  run ledger. It records reasoning, debugging, system understanding, AI contribution,
+  personal verification, and calibration telemetry; it is never deployed with the
+  graded product.
+- **Wayfinder** — a read-only mid-development direction check against the frozen daily
+  plan. It reports priority, risk, and missing proof without issuing a grade or changing
+  requirements.
+- **Infrastructure Error** — failure of the controller, model, network, or browser
+  tooling. It triggers retry and maintenance evidence, not learner failure.
+- **Appeal** — one committed, evidence-cited challenge to a specific factual or rubric-
+  application error in a finalized daily report. It cannot add evidence or request a
+  general regrade.
+- **Gauntlet Skill** — the reusable LLM-facing lifecycle that configures and operates
+  variable accountability runs. Scheduling and external enforcement remain controller
+  responsibilities.

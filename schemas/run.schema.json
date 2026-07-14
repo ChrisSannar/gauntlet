@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gauntlet/run.schema.json",
+  "title": "Gauntlet Run Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "ledger",
+    "project",
+    "schedule",
+    "accountability",
+    "verification",
+    "adapters"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "status": {
+      "enum": ["draft", "active", "complete", "cancelled"]
+    },
+    "ledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["remote", "branch"],
+      "properties": {
+        "remote": { "type": "string", "minLength": 1 },
+        "branch": { "type": "string", "minLength": 1 }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "remote", "branch", "deployed_url", "backlog_path"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "remote": { "type": "string", "minLength": 1 },
+        "branch": { "type": "string", "minLength": 1 },
+        "deployed_url": {
+          "type": "string",
+          "anyOf": [
+            { "format": "uri", "pattern": "^https://" },
+            { "const": "PENDING" }
+          ]
+        },
+        "backlog_path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timezone",
+        "start_date",
+        "end_date",
+        "cutoff_local_time",
+        "target_focused_hours"
+      ],
+      "properties": {
+        "timezone": { "type": "string", "minLength": 1 },
+        "start_date": { "type": "string", "format": "date" },
+        "end_date": { "type": "string", "format": "date" },
+        "cutoff_local_time": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "target_focused_hours": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "accountability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rubric_path",
+        "mastery_template_path",
+        "overall_rule",
+        "consequence",
+        "publishing"
+      ],
+      "properties": {
+        "rubric_path": { "type": "string", "minLength": 1 },
+        "mastery_template_path": { "type": "string", "minLength": 1 },
+        "overall_rule": { "enum": ["lower-of-delivery-mastery"] },
+        "consequence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "description", "automatic_execution"],
+          "properties": {
+            "mode": {
+              "enum": ["none", "record-only", "public", "reset", "custom"]
+            },
+            "description": { "type": "string" },
+            "automatic_execution": { "type": "boolean" }
+          }
+        },
+        "publishing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "channels", "approval_required"],
+          "properties": {
+            "mode": { "enum": ["disabled", "draft-only", "automatic"] },
+            "channels": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "approval_required": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands", "browser"],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/check" }
+        },
+        "browser": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "adapter", "required"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "adapter": {
+              "anyOf": [
+                { "$ref": "#/$defs/adapter" },
+                { "type": "null" }
+              ]
+            },
+            "required": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "adapters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grader", "planner", "appeal_judge"],
+      "properties": {
+        "grader": { "$ref": "#/$defs/adapter" },
+        "planner": { "$ref": "#/$defs/adapter" },
+        "appeal_judge": { "$ref": "#/$defs/adapter" }
+      }
+    }
+  },
+  "$defs": {
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "timeout_seconds"],
+      "properties": {
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "command", "timeout_seconds", "required"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+        },
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "required": { "type": "boolean" }
+      }
+    }
+  }
+}

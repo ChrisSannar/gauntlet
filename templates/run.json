@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "run_id": "replace-me",
+  "status": "draft",
+  "ledger": {
+    "remote": "PENDING",
+    "branch": "main"
+  },
+  "project": {
+    "name": "Replace Me",
+    "remote": "PENDING",
+    "branch": "main",
+    "deployed_url": "PENDING",
+    "backlog_path": "projects/replace-me/BACKLOG.md"
+  },
+  "schedule": {
+    "timezone": "America/Chicago",
+    "start_date": "2026-01-01",
+    "end_date": "2026-01-05",
+    "cutoff_local_time": "00:00",
+    "target_focused_hours": 40
+  },
+  "accountability": {
+    "rubric_path": "docs/daily-grading-rubric.md",
+    "mastery_template_path": "templates/daily-mastery-note.md",
+    "overall_rule": "lower-of-delivery-mastery",
+    "consequence": {
+      "mode": "none",
+      "description": "No hard consequence for this run.",
+      "automatic_execution": false
+    },
+    "publishing": {
+      "mode": "disabled",
+      "channels": [],
+      "approval_required": true
+    }
+  },
+  "verification": {
+    "commands": [],
+    "browser": {
+      "enabled": false,
+      "adapter": null,
+      "required": false
+    }
+  },
+  "adapters": {
+    "grader": {
+      "command": ["replace-with-grader-adapter"],
+      "timeout_seconds": 900
+    },
+    "planner": {
+      "command": ["replace-with-planner-adapter"],
+      "timeout_seconds": 900
+    },
+    "appeal_judge": {
+      "command": ["replace-with-appeal-adapter"],
+      "timeout_seconds": 900
+    }
+  }
+}
