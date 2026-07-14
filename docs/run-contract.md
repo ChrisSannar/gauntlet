@@ -6,16 +6,33 @@
 ## Variable per run
 
 - Gauntlet evidence-ledger remote and branch.
-- Product name, repository, branch, deployed URL, and backlog.
+- Product name, repository, branch, evidence mode, optional deployed URL, and backlog.
 - Start/end dates, timezone, cutoff, and target focused hours.
 - Public rubric, mastery template, and overall-score rule.
 - Failure consequence and whether any consequence may execute automatically.
 - Publishing mode, channels, and approval requirement.
-- Deterministic/E2E commands and live-browser adapter.
+- Deterministic/unit/integration/local-E2E commands and optional live-browser adapter.
 - Grader, planner, and appeal-judge adapter commands.
 
 The reusable skill and controller must not infer authority from a previous run. A new
 run defaults to no automatic consequence and no publishing.
+
+`project.evidence_mode = "repository-only"` requires `deployed_url = null` and disables
+browser review. Only the two frozen remote commits, their committed artifacts, and
+checks executed from the frozen product clone are eligible. A check marked
+`infrastructure: true` provisions the offline test environment; failure is
+`INFRA_ERROR`, not a delivery result.
+
+## Cutoff and retry contract
+
+Before tests or adapters, the controller creates an exclusive local freeze record and
+pins ledger and product branch heads. The 00:15 and 00:30 retries reuse it. If the first
+attempt cannot complete both pins, the record remains incomplete and later heads are
+inadmissible. Losing or corrupting controller state is `INFRA_ERROR`.
+
+Evidence is read from detached frozen commits. Controller reports are committed on top
+of the then-current ledger head, preserving post-cutoff work while excluding it from the
+grade. A matching finalized report makes every retry a no-op.
 
 ## Adapter protocol
 
@@ -25,7 +42,7 @@ on standard output. Diagnostic text belongs on standard error. A nonzero exit, t
 invalid JSON, or schema-invalid response is `INFRA_ERROR`.
 
 The command is model-neutral: it may call a local model, hosted API, agent CLI, or a
-test fixture. Secrets come from the controller environment and never from `run.json`,
+test fixture. Secrets, including `OPENROUTER_API_KEY`, come from the controller environment and never from `run.json`,
 evidence bundles, prompts, or reports.
 
 ## Authority boundary

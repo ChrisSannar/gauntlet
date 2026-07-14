@@ -1,8 +1,8 @@
 # Tutoring Platform
 
-**Dates:** 2026-07-13 through 2026-07-17
+**Dates:** 2026-07-15 through 2026-07-17
 
-**Target:** 40 focused hours across five days
+**Target:** 30 focused hours across three days
 
 **Product:** operating system for a single-tutor business
 
@@ -24,6 +24,6 @@ remain in the repository-wide `docs/GLOSSARY.md`.
 Do not silently turn unresolved questions into requirements. The adaptive planner may
 schedule a product-decision task, freeze its answer, and then schedule implementation.
 
-The capabilities in `PRODUCT-GRILLING.md` form an ordered backlog, not a promise that
-all features fit this run. Each daily plan must select a thin, deployed vertical slice
-that is credible within the remaining 40-hour envelope.
+The frozen required slice is `landing page → personalized invitation → account claim
+→ session request`. See [`BOUNDARIES.md`](BOUNDARIES.md). Grading uses only committed
+and pushed repository evidence; deployment and external services are not required.

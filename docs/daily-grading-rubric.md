@@ -9,7 +9,7 @@ never retroactively change the contract for a frozen day.
 - Grade only the day's frozen plan and frozen evidence bundle.
 - Award no credit for time spent, code volume, or work pushed after midnight.
 - Do not require stretch work or invent acceptance criteria.
-- Return `INFRA_ERROR` without a grade when controller, network, model, or browser
+- Return `INFRA_ERROR` without a grade when controller, dependency cache, model, or local test
   infrastructure prevents a fair review.
 - Cite evidence for every nonzero score and state confidence as low, medium, or high.
 
@@ -17,13 +17,13 @@ never retroactively change the contract for a frozen day.
 
 ### 4 — Excellent
 
-Every required outcome works and has reproducible evidence. The deployed critical path,
-tests, and E2E checks agree. The implementation handles material failure cases within
+Every required outcome works and has reproducible repository evidence. Deterministic
+tests and local E2E checks agree. The implementation handles material failure cases within
 the frozen scope without a known high-impact defect.
 
 ### 3 — Complete
 
-Every required outcome is satisfied with credible committed and deployed evidence.
+Every required outcome is satisfied with credible committed repository evidence.
 Required verification passes. Remaining issues are minor and do not break the promised
 behavior.
 

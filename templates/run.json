@@ -10,7 +10,8 @@
     "name": "Replace Me",
     "remote": "PENDING",
     "branch": "main",
-    "deployed_url": "PENDING",
+    "evidence_mode": "repository-only",
+    "deployed_url": null,
     "backlog_path": "projects/replace-me/BACKLOG.md"
   },
   "schedule": {

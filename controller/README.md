@@ -24,11 +24,16 @@ diagnostic. The controller never converts them into a learner grade.
 
 ## Current minimum
 
-The close-day path pins and clones the ledger and product branches, runs configured
-checks, optionally invokes the browser adapter, invokes the grader, enforces the
-lower-of-two result, invokes the planner, commits the append-only artifacts to the
-ledger, and pushes the ledger branch.
+The close-day path atomically persists the first observed ledger and product SHAs before
+checks or model calls. Retries reuse that freeze, read evidence from detached frozen
+commits, and append output on top of the current ledger head. An incomplete original
+freeze is permanently `INFRA_ERROR`; a later push can never replace it.
+
+Repository-only runs require `deployed_url: null` and disable browser review. Configured
+checks may still launch a repository-local Playwright application. Checks marked
+`infrastructure: true` convert provisioning/cache failures to `INFRA_ERROR` instead of
+learner failure.
 
 The server still needs Git credentials for the ledger, read access to the product, the
-configured LLM adapter executables/secrets, and cron. A run remains draft until its
+configured LLM adapter executables/secrets, offline dependency caches, and cron. A run remains draft until its
 `PENDING` values are replaced and `status` becomes `active`.

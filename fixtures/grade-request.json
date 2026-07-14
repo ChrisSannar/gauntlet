@@ -1,0 +1,9 @@
+{
+  "operation": "grade-day",
+  "rubric": "Fixture rubric: score delivery and mastery from 0 to 4 in 0.5 increments.",
+  "evidence": {
+    "day": "2026-07-15",
+    "checks": [{"id": "fixture", "passed": true}],
+    "mastery_note": "I verified the fixture path and can explain its failure boundary."
+  }
+}

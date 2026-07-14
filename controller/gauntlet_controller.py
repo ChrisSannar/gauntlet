@@ -79,7 +79,7 @@ def validate_run(config: dict[str, Any], operational: bool = False) -> None:
 
     for owner, fields in (
         (ledger, ("remote", "branch")),
-        (project, ("name", "remote", "branch", "deployed_url", "backlog_path")),
+        (project, ("name", "remote", "branch", "evidence_mode", "deployed_url", "backlog_path")),
         (
             schedule,
             ("timezone", "start_date", "end_date", "cutoff_local_time", "target_focused_hours"),
@@ -112,6 +112,16 @@ def validate_run(config: dict[str, Any], operational: bool = False) -> None:
     if not isinstance(verification["commands"], list):
         raise ControllerError("verification.commands must be an array")
     browser = require_mapping(verification["browser"], "verification.browser")
+    evidence_mode = project["evidence_mode"]
+    if evidence_mode not in ("repository-only", "deployed"):
+        raise ControllerError("project.evidence_mode must be repository-only or deployed")
+    if evidence_mode == "repository-only":
+        if project["deployed_url"] is not None:
+            raise ControllerError("repository-only mode requires deployed_url=null")
+        if browser.get("enabled") or browser.get("required"):
+            raise ControllerError("repository-only mode cannot enable browser review")
+    elif not isinstance(project["deployed_url"], str) or not project["deployed_url"].startswith("https://"):
+        raise ControllerError("deployed mode requires an https deployed_url")
     if browser.get("required") and not browser.get("enabled"):
         raise ControllerError("required browser verification cannot be disabled")
     for role in ("grader", "planner", "appeal_judge"):
@@ -221,10 +231,68 @@ def clone_branch(remote: str, branch: str, destination: Path, expected_sha: str)
         raise ControllerError(f"remote moved while freezing evidence: expected {expected_sha}, got {actual}")
 
 
-def run_checks(checks: list[dict[str, Any]], checkout: Path, deployed_url: str) -> list[dict[str, Any]]:
+def clone_commit(remote: str, destination: Path, expected_sha: str) -> None:
+    """Clone a repository and detach at an already-frozen commit."""
+    result = run_process(["git", "clone", "--quiet", remote, str(destination)], timeout=600)
+    if result.returncode != 0:
+        raise ControllerError(f"clone failed: {result.stderr.strip()}")
+    git_output(["checkout", "--quiet", "--detach", expected_sha], cwd=destination)
+    actual = git_output(["rev-parse", "HEAD"], cwd=destination)
+    if actual != expected_sha:
+        raise ControllerError(f"could not check out frozen evidence: expected {expected_sha}, got {actual}")
+
+
+def freeze_path(state_dir: Path, run_id: str, day: dt.date) -> Path:
+    return state_dir / run_id / "freezes" / f"{day.isoformat()}.json"
+
+
+def establish_freeze(
+    config: dict[str, Any], day: dt.date, state_dir: Path, now: dt.datetime | None = None
+) -> dict[str, Any]:
+    """Persist the first observed remote heads; incomplete freezes are never retried."""
+    path = freeze_path(state_dir, config["run_id"], day)
+    if path.exists():
+        freeze = read_json(path)
+        if freeze.get("status") != "frozen":
+            raise ControllerError("original cutoff freeze is incomplete; later remote heads are inadmissible")
+        return freeze
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    initiated = (now or dt.datetime.now(dt.UTC)).astimezone(dt.UTC).isoformat()
+    freeze: dict[str, Any] = {
+        "schema_version": 1,
+        "run_id": config["run_id"],
+        "day": day.isoformat(),
+        "status": "freezing",
+        "initiated_at": initiated,
+    }
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w") as handle:
+            json.dump(freeze, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+    except FileExistsError:
+        return establish_freeze(config, day, state_dir, now)
+    try:
+        freeze["ledger_sha"] = pin_remote(config["ledger"]["remote"], config["ledger"]["branch"])
+        write_json(path, freeze)
+        freeze["product_sha"] = pin_remote(config["project"]["remote"], config["project"]["branch"])
+        freeze["status"] = "frozen"
+        freeze["completed_at"] = dt.datetime.now(dt.UTC).isoformat()
+        write_json(path, freeze)
+        return freeze
+    except ControllerError:
+        write_json(path, freeze)
+        raise
+
+
+def run_checks(
+    checks: list[dict[str, Any]], checkout: Path, deployed_url: str | None
+) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     environment = os.environ.copy()
-    environment["GAUNTLET_DEPLOYED_URL"] = deployed_url
+    if deployed_url is not None:
+        environment["GAUNTLET_DEPLOYED_URL"] = deployed_url
     for check in checks:
         command = check.get("command")
         if not isinstance(command, list) or not command or not all(isinstance(x, str) for x in command):
@@ -236,6 +304,9 @@ def run_checks(checks: list[dict[str, Any]], checkout: Path, deployed_url: str) 
             timeout=int(check.get("timeout_seconds", 300)),
             env=environment,
         )
+        if result.returncode != 0 and bool(check.get("infrastructure", False)):
+            detail = result.stderr.strip() or result.stdout.strip() or "no diagnostic output"
+            raise ControllerError(f"verification infrastructure failed for {check.get('id')}: {detail}")
         duration = (dt.datetime.now(dt.UTC) - started).total_seconds()
         results.append(
             {
@@ -244,8 +315,8 @@ def run_checks(checks: list[dict[str, Any]], checkout: Path, deployed_url: str) 
                 "required": bool(check.get("required", True)),
                 "exit_code": result.returncode,
                 "duration_seconds": round(duration, 3),
-                "stdout": result.stdout,
-                "stderr": result.stderr,
+                "stdout": result.stdout[-12000:],
+                "stderr": result.stderr[-12000:],
                 "passed": result.returncode == 0,
             }
         )
@@ -315,46 +386,71 @@ def date_in_run(config: dict[str, Any], day: dt.date) -> bool:
     )
 
 
+def ensure_cutoff_reached(config: dict[str, Any], day: dt.date, now: dt.datetime | None = None) -> None:
+    timezone = ZoneInfo(config["schedule"]["timezone"])
+    hour, minute = (int(part) for part in config["schedule"]["cutoff_local_time"].split(":"))
+    cutoff = dt.datetime.combine(day + dt.timedelta(days=1), dt.time(hour, minute), timezone)
+    current = now.astimezone(timezone) if now else dt.datetime.now(timezone)
+    if current < cutoff:
+        raise ControllerError(f"cutoff has not been reached for {day}")
+
+
 def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any]:
     bootstrap = read_json(config_path)
     validate_run(bootstrap, operational=True)
     if not date_in_run(bootstrap, day):
         raise ControllerError(f"{day} is outside configured run dates")
+    ensure_cutoff_reached(bootstrap, day)
 
     ledger_cfg = bootstrap["ledger"]
     product_cfg = bootstrap["project"]
-    ledger_sha = pin_remote(ledger_cfg["remote"], ledger_cfg["branch"])
-    product_sha = pin_remote(product_cfg["remote"], product_cfg["branch"])
+    freeze = establish_freeze(bootstrap, day, state_dir)
+    ledger_sha = str(freeze["ledger_sha"])
+    product_sha = str(freeze["product_sha"])
 
     with tempfile.TemporaryDirectory(prefix="gauntlet-close-") as temporary:
         root = Path(temporary)
-        ledger = root / "ledger"
+        frozen_ledger = root / "frozen-ledger"
+        ledger = root / "ledger-output"
         product = root / "product"
-        clone_branch(ledger_cfg["remote"], ledger_cfg["branch"], ledger, ledger_sha)
-        clone_branch(product_cfg["remote"], product_cfg["branch"], product, product_sha)
+        current_ledger_sha = pin_remote(ledger_cfg["remote"], ledger_cfg["branch"])
+        clone_branch(ledger_cfg["remote"], ledger_cfg["branch"], ledger, current_ledger_sha)
 
-        ledger_config_path = ledger / "runs" / bootstrap["run_id"] / "run.json"
+        output_day_dir = ledger / "runs" / bootstrap["run_id"] / "days" / day.isoformat()
+        existing_grade_path = output_day_dir / "grade.json"
+        existing_evidence_path = output_day_dir / "evidence.json"
+        if existing_grade_path.exists() and existing_evidence_path.exists():
+            existing_evidence = read_json(existing_evidence_path)
+            if (
+                existing_evidence.get("ledger_sha") != ledger_sha
+                or existing_evidence.get("product_sha") != product_sha
+            ):
+                raise ControllerError("finalized report does not match the original freeze record")
+            return {
+                "status": "already-finalized",
+                "evidence": existing_evidence,
+                "grade": read_json(existing_grade_path),
+            }
+        if existing_grade_path.exists() or existing_evidence_path.exists():
+            raise ControllerError("day contains a partial finalized report; manual recovery required")
+
+        clone_commit(ledger_cfg["remote"], frozen_ledger, ledger_sha)
+        clone_commit(product_cfg["remote"], product, product_sha)
+
+        ledger_config_path = frozen_ledger / "runs" / bootstrap["run_id"] / "run.json"
         config = read_json(ledger_config_path)
         validate_run(config, operational=True)
         if sha256_value(config) != sha256_value(bootstrap):
             raise ControllerError("bootstrap configuration differs from frozen ledger configuration")
 
-        day_dir = ledger / "runs" / config["run_id"] / "days" / day.isoformat()
-        existing_grade_path = day_dir / "grade.json"
-        existing_evidence_path = day_dir / "evidence.json"
-        if existing_grade_path.exists() and existing_evidence_path.exists():
-            return {
-                "status": "already-finalized",
-                "evidence": read_json(existing_evidence_path),
-                "grade": read_json(existing_grade_path),
-            }
-        if existing_grade_path.exists() or existing_evidence_path.exists():
-            raise ControllerError("day contains a partial finalized report; manual recovery required")
-        plan = read_required(day_dir / "plan.md", "frozen daily plan")
-        mastery_path = day_dir / "mastery.md"
+        frozen_day_dir = frozen_ledger / "runs" / config["run_id"] / "days" / day.isoformat()
+        day_dir = output_day_dir
+        day_dir.mkdir(parents=True, exist_ok=True)
+        plan = read_required(frozen_day_dir / "plan.md", "frozen daily plan")
+        mastery_path = frozen_day_dir / "mastery.md"
         mastery = mastery_path.read_text() if mastery_path.exists() else ""
-        rubric = read_required(ledger / config["accountability"]["rubric_path"], "rubric")
-        backlog = read_required(ledger / config["project"]["backlog_path"], "backlog")
+        rubric = read_required(frozen_ledger / config["accountability"]["rubric_path"], "rubric")
+        backlog = read_required(frozen_ledger / config["project"]["backlog_path"], "backlog")
         checks = run_checks(config["verification"]["commands"], product, config["project"]["deployed_url"])
 
         browser_result: dict[str, Any] | None = None
@@ -373,12 +469,12 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
                 },
             )
 
-        frozen_at = dt.datetime.now(dt.UTC).isoformat()
         evidence = {
             "schema_version": 1,
             "run_id": config["run_id"],
             "day": day.isoformat(),
-            "frozen_at": frozen_at,
+            "frozen_at": freeze["completed_at"],
+            "freeze_initiated_at": freeze["initiated_at"],
             "run_config_sha256": sha256_value(config),
             "ledger_sha": ledger_sha,
             "product_sha": product_sha,
@@ -397,6 +493,7 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
                 "evidence": evidence,
             },
         )
+        grader_metadata = grade_response.pop("_adapter", None)
         grade = normalize_grade(grade_response)
         grade.update(
             {
@@ -404,6 +501,7 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
                 "run_id": config["run_id"],
                 "day": day.isoformat(),
                 "evidence_sha256": sha256_value(evidence),
+                "adapter": grader_metadata,
             }
         )
 
@@ -429,6 +527,7 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
                     "backlog": backlog,
                 },
             )
+            planner_metadata = plan_response.pop("_adapter", None)
             plan_markdown = plan_response.get("plan_markdown")
             if not isinstance(plan_markdown, str) or not plan_markdown.strip():
                 raise ControllerError("planner response requires nonempty plan_markdown")
@@ -438,9 +537,10 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
                 raise ControllerError("next daily boundary already exists; refusing to overwrite it")
             (next_dir / "plan.md").write_text(plan_markdown.rstrip() + "\n")
             mastery_template = read_required(
-                ledger / config["accountability"]["mastery_template_path"], "mastery template"
+                frozen_ledger / config["accountability"]["mastery_template_path"], "mastery template"
             )
             (next_dir / "mastery.md").write_text(mastery_template)
+            write_json(next_dir / "plan-metadata.json", {"adapter": planner_metadata})
 
         git_output(["config", "user.name", "Gauntlet Controller"], cwd=ledger)
         git_output(["config", "user.email", "controller@gauntlet.invalid"], cwd=ledger)
@@ -479,7 +579,13 @@ def cron_lines(config_path: Path, state_dir: Path) -> str:
         )
     ]
     command = f"flock -n {' '.join(quoted)} >> {shlex.quote(str(log))} 2>&1"
-    return f"CRON_TZ={config['schedule']['timezone']}\n{int(minute)} {int(hour)} * * * {command}\n"
+    times = [(int(minute), int(hour))]
+    cutoff = dt.datetime(2000, 1, 1, int(hour), int(minute))
+    for delay in (15, 30):
+        retry = cutoff + dt.timedelta(minutes=delay)
+        times.append((retry.minute, retry.hour))
+    entries = "".join(f"{entry_minute} {entry_hour} * * * {command}\n" for entry_minute, entry_hour in times)
+    return f"CRON_TZ={config['schedule']['timezone']}\n{entries}"
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

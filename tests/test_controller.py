@@ -12,6 +12,9 @@ from controller.gauntlet_controller import (
     ControllerError,
     automatic_day,
     close_day,
+    cron_lines,
+    establish_freeze,
+    ensure_cutoff_reached,
     invoke_adapter,
     normalize_grade,
     pin_remote,
@@ -52,6 +55,8 @@ class ControllerTests(unittest.TestCase):
 
     def test_required_browser_cannot_be_disabled(self) -> None:
         config = json.loads((ROOT / "templates" / "run.json").read_text())
+        config["project"]["evidence_mode"] = "deployed"
+        config["project"]["deployed_url"] = "https://example.test"
         config["verification"]["browser"]["required"] = True
         with self.assertRaisesRegex(ControllerError, "cannot be disabled"):
             validate_run(config)
@@ -137,7 +142,8 @@ class ControllerTests(unittest.TestCase):
                     "name": "Test",
                     "remote": str(product_remote),
                     "branch": "main",
-                    "deployed_url": "https://example.test",
+                    "evidence_mode": "repository-only",
+                    "deployed_url": None,
                     "backlog_path": "projects/test/BACKLOG.md",
                 },
                 "schedule": {
@@ -207,6 +213,35 @@ class ControllerTests(unittest.TestCase):
                 ledger / "runs" / run_id / "run.json", dt.date(2026, 7, 13), root / "state"
             )
             self.assertEqual(repeated["status"], "already-finalized")
+
+    def test_repository_only_rejects_deployment_and_browser(self) -> None:
+        config = json.loads((ROOT / "templates" / "run.json").read_text())
+        config["project"]["deployed_url"] = "https://example.test"
+        with self.assertRaisesRegex(ControllerError, "deployed_url=null"):
+            validate_run(config)
+
+    def test_incomplete_freeze_never_admits_later_heads(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary)
+            config = json.loads((ROOT / "templates" / "run.json").read_text())
+            config["run_id"] = "freeze-test"
+            path = state / "freeze-test" / "freezes" / "2026-07-15.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({"status": "freezing"}))
+            with self.assertRaisesRegex(ControllerError, "original cutoff freeze is incomplete"):
+                establish_freeze(config, dt.date(2026, 7, 15), state)
+
+    def test_cron_has_midnight_and_two_retries(self) -> None:
+        config_path = ROOT / "projects" / "tutoring-platform" / "run.template.json"
+        lines = cron_lines(config_path, Path("/tmp/gauntlet-state")).splitlines()
+        self.assertEqual(lines[0], "CRON_TZ=America/Chicago")
+        self.assertEqual([line.split()[:2] for line in lines[1:]], [["0", "0"], ["15", "0"], ["30", "0"]])
+
+    def test_day_cannot_freeze_before_its_cutoff(self) -> None:
+        config = json.loads((ROOT / "templates" / "run.json").read_text())
+        now = dt.datetime(2026, 1, 1, 23, 59, tzinfo=dt.UTC)
+        with self.assertRaisesRegex(ControllerError, "cutoff has not been reached"):
+            ensure_cutoff_reached(config, dt.date(2026, 1, 1), now)
 
     def test_automatic_day_is_previous_local_date(self) -> None:
         config = json.loads((ROOT / "templates" / "run.json").read_text())

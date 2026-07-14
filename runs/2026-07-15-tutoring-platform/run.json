@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-07-15-tutoring-platform",
+  "status": "draft",
+  "ledger": {
+    "remote": "git@github.com:ChrisSannar/gauntlet.git",
+    "branch": "master"
+  },
+  "project": {
+    "name": "Single-Tutor Platform",
+    "remote": "git@github.com:ChrisSannar/tutoring-platform.git",
+    "branch": "main",
+    "evidence_mode": "repository-only",
+    "deployed_url": null,
+    "backlog_path": "projects/tutoring-platform/BOUNDARIES.md"
+  },
+  "schedule": {
+    "timezone": "America/Chicago",
+    "start_date": "2026-07-15",
+    "end_date": "2026-07-17",
+    "cutoff_local_time": "00:00",
+    "target_focused_hours": 30
+  },
+  "accountability": {
+    "rubric_path": "docs/daily-grading-rubric.md",
+    "mastery_template_path": "templates/daily-mastery-note.md",
+    "overall_rule": "lower-of-delivery-mastery",
+    "consequence": {
+      "mode": "none",
+      "description": "Three-day pilot: retain evidence, grades, and calibration data only.",
+      "automatic_execution": false
+    },
+    "publishing": {
+      "mode": "draft-only",
+      "channels": ["x"],
+      "approval_required": true
+    }
+  },
+  "verification": {
+    "commands": [
+      {
+        "id": "python-dependencies",
+        "command": ["env", "UV_CACHE_DIR=/var/cache/gauntlet/uv", "uv", "sync", "--frozen", "--offline", "--all-extras"],
+        "timeout_seconds": 300,
+        "required": true,
+        "infrastructure": true
+      },
+      {
+        "id": "javascript-dependencies",
+        "command": ["env", "BUN_INSTALL_CACHE_DIR=/var/cache/gauntlet/bun", "bun", "install", "--frozen-lockfile", "--offline"],
+        "timeout_seconds": 300,
+        "required": true,
+        "infrastructure": true
+      },
+      {
+        "id": "frontend-typecheck",
+        "command": ["bun", "run", "typecheck"],
+        "timeout_seconds": 120,
+        "required": true
+      },
+      {
+        "id": "frontend-unit",
+        "command": ["bun", "run", "test"],
+        "timeout_seconds": 120,
+        "required": true
+      },
+      {
+        "id": "backend-tests",
+        "command": ["uv", "run", "--offline", "--extra", "test", "pytest"],
+        "timeout_seconds": 180,
+        "required": true
+      },
+      {
+        "id": "frontend-build",
+        "command": ["bun", "run", "build"],
+        "timeout_seconds": 180,
+        "required": true
+      },
+      {
+        "id": "critical-path-e2e",
+        "command": ["env", "UV_CACHE_DIR=/var/cache/gauntlet/uv", "PLAYWRIGHT_BROWSERS_PATH=/var/cache/gauntlet/playwright", "bun", "run", "e2e"],
+        "timeout_seconds": 300,
+        "required": true
+      }
+    ],
+    "browser": {
+      "enabled": false,
+      "adapter": null,
+      "required": false
+    }
+  },
+  "adapters": {
+    "grader": {
+      "command": ["/opt/gauntlet/.venv/bin/python", "/opt/gauntlet/controller/openrouter_adapter.py"],
+      "timeout_seconds": 180
+    },
+    "planner": {
+      "command": ["/opt/gauntlet/.venv/bin/python", "/opt/gauntlet/controller/openrouter_adapter.py"],
+      "timeout_seconds": 180
+    },
+    "appeal_judge": {
+      "command": ["/opt/gauntlet/.venv/bin/python", "/opt/gauntlet/controller/openrouter_adapter.py"],
+      "timeout_seconds": 180
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "operation": "plan-day",
+  "run": {"run_id": "fixture", "project": {"name": "Fixture"}},
+  "day": "2026-07-16",
+  "previous_plan": "# Fixture",
+  "previous_grade": {"delivery_score": 3, "mastery_score": 2.5},
+  "backlog": "Fix the mastery gap."
+}

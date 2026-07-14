@@ -1,4 +1,4 @@
-# Product Grilling: Single-Tutor Platform (2026-07-13 through 2026-07-17)
+# Product Grilling: Single-Tutor Platform (2026-07-15 through 2026-07-17)
 
 *Product scope for a one-week build used to test the Gauntlet's adaptive
 accountability loop.*
@@ -19,7 +19,7 @@ tutor shares with them.
 The reward for efficient work is more functioning product. The task backlog may remain
 open-ended, while each day retains a finite required boundary (ADR 0016).
 
-The pilot has a 40-hour envelope. Intended capabilities below are backlog candidates;
+The pilot has a 30-hour envelope. Intended capabilities below are backlog candidates;
 the adaptive planner must prefer thin end-to-end value over incomplete breadth.
 
 ## Actors
@@ -53,15 +53,11 @@ the adaptive planner must prefer thin end-to-end value over incomplete breadth.
 - Lesson reminders.
 - Payment collection and payment-state visibility.
 
-## Day 1 deployment constraint
+## Repository-only evidence constraint
 
-Day 1 establishes the project and deploys a reachable product skeleton to Chris's
-DigitalOcean server under his website. Chris will supply the final URL after setup.
-Later daily work must preserve a deployable main path so midnight grading can run E2E
-tests and a live product check against the hosted application.
-
-The Day 1 product may be thin, but it must be a real deployed application rather than
-only infrastructure notes or a local mockup.
+The product is not deployed during this run. The controller clones the frozen product
+commit and runs unit, integration, type, build, and local Playwright checks there.
+Real email, calendar, payment, and network-service availability are not grading gates.
 
 ## Explicit pilot non-goals
 
