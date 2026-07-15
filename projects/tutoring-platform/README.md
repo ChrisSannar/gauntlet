@@ -8,9 +8,11 @@
 
 **Purpose:** test the Gauntlet accountability system while building useful software
 
-This folder is the complete product-specific workspace. Tutoring-platform scope,
-domain language, product decisions, backlog candidates, and its draft Gauntlet run
-configuration belong here. Reusable Gauntlet machinery stays at the repository root.
+This is a ledger-owned configuration folder, not the product repository. It must not
+contain `.git` metadata or application code. Tutoring-platform scope, domain language,
+product decisions, backlog candidates, and draft Gauntlet configuration belong here.
+Reusable Gauntlet machinery stays at the ledger root; application code lives in the
+separate `tutoring-platform` repository configured by the active run.
 
 ## Continue tomorrow
 

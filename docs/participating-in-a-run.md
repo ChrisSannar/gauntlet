@@ -3,6 +3,17 @@
 The daily plan is the frozen instruction contract. Do not infer extra requirements from
 the broader backlog, and do not wait for a person or agent to start the day.
 
+## Keep the repositories separate
+
+The Gauntlet ledger owns `projects/`, `runs/`, controller automation, daily plans,
+mastery notes, and grades. The product repository owns only application code,
+application documentation, and repository-local tests or development tooling.
+
+Do not clone or initialize the product repository inside `projects/`. A folder such as
+`projects/tutoring-platform/` is ordinary ledger content and must not contain `.git`
+metadata. Product-specific Gauntlet requirements belong there or under the active run,
+never on a branch of the product remote.
+
 ## Start the day
 
 From the Gauntlet ledger:
