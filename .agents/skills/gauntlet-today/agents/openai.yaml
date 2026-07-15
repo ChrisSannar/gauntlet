@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gauntlet Today"
+  short_description: "Show today’s frozen Gauntlet instructions"
+  default_prompt: "Use $gauntlet-today to show me today’s frozen Gauntlet instructions."
