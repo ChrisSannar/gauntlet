@@ -38,8 +38,9 @@ the smallest missing decision.
    browser, and adapter configuration.
 3. Require explicit user decisions for consequences and publishing. Default both to
    disabled; do not copy authority from another run.
-4. Keep a product's draft configuration under `projects/<project>/`; copy only an
-   activated run to `runs/<run-id>/run.json`.
+4. Keep a product's draft configuration under `projects/<project>/` only before
+   activation. Copy the activated configuration to `runs/<run-id>/run.json`, then
+   remove the draft so there is one operational configuration.
 5. Validate against `schemas/run.schema.json`. Keep unresolved external values as
    `PENDING` while status is `draft`; never activate a run containing them.
 

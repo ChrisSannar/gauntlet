@@ -234,7 +234,7 @@ class ControllerTests(unittest.TestCase):
                 establish_freeze(config, dt.date(2026, 7, 15), state)
 
     def test_cron_has_midnight_and_two_retries(self) -> None:
-        config_path = ROOT / "projects" / "tutoring-platform" / "run.template.json"
+        config_path = ROOT / "runs" / "2026-07-15-tutoring-platform" / "run.json"
         lines = cron_lines(config_path, Path("/tmp/gauntlet-state")).splitlines()
         self.assertEqual(lines[0], "CRON_TZ=America/Chicago")
         self.assertEqual([line.split()[:2] for line in lines[1:]], [["0", "0"], ["15", "0"], ["30", "0"]])

@@ -10,9 +10,10 @@
 
 This is a ledger-owned configuration folder, not the product repository. It must not
 contain `.git` metadata or application code. Tutoring-platform scope, domain language,
-product decisions, backlog candidates, and draft Gauntlet configuration belong here.
-Reusable Gauntlet machinery stays at the ledger root; application code lives in the
-separate `tutoring-platform` repository configured by the active run.
+product decisions, and backlog candidates belong here. The operational Gauntlet
+configuration lives only at `runs/2026-07-15-tutoring-platform/run.json`. Reusable
+Gauntlet machinery stays at the ledger root; application code lives in the separate
+`tutoring-platform` repository configured by the active run.
 
 ## Continue tomorrow
 
