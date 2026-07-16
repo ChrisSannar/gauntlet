@@ -1,5 +1,9 @@
 # Tutoring Platform — Frozen Three-Day Boundaries
 
+Every daily boundary is subject to the security completion gate in
+[`PRODUCT-GRILLING.md`](PRODUCT-GRILLING.md); functionality without its required
+security boundaries and negative-path tests is incomplete.
+
 ## Required slice
 
 `landing page → personalized invitation → account claim → session request`
@@ -8,8 +12,10 @@
 
 - Complete accountability preflight.
 - Establish React/TypeScript/Bun/Vite and Python/FastAPI/SQLite layers.
-- Build a tested landing page and API health path.
-- Establish the repository-local Playwright critical-path harness.
+- Build a tested landing page, liveness-only `GET /api/health` route, and
+  database/schema-aware `GET /api/ready` route with sanitized failure responses.
+- Establish `bun run test:e2e` as the repository-local Playwright command that owns an
+  isolated migrated SQLite database plus both application processes and their cleanup.
 
 ## Day 2 — Personalized invitation (July 16)
 
