@@ -40,7 +40,7 @@
     "commands": [
       {
         "id": "python-dependencies",
-        "command": ["env", "UV_CACHE_DIR=/home/chrissannar/.cache/gauntlet/uv", "uv", "sync", "--frozen", "--offline", "--all-extras"],
+        "command": ["env", "UV_CACHE_DIR=/tmp/tutoring-platform-uv-cache", "uv", "sync", "--project", "backend", "--locked", "--offline", "--group", "test"],
         "timeout_seconds": 300,
         "required": true,
         "infrastructure": true
@@ -54,19 +54,19 @@
       },
       {
         "id": "frontend-typecheck",
-        "command": ["bun", "run", "typecheck"],
+        "command": ["bun", "run", "--cwd", "frontend", "build"],
         "timeout_seconds": 120,
         "required": true
       },
       {
         "id": "frontend-unit",
-        "command": ["bun", "run", "test"],
+        "command": ["bun", "run", "--cwd", "frontend", "test"],
         "timeout_seconds": 120,
         "required": true
       },
       {
         "id": "backend-tests",
-        "command": ["env", "UV_CACHE_DIR=/home/chrissannar/.cache/gauntlet/uv", "uv", "run", "--offline", "--extra", "test", "pytest"],
+        "command": ["env", "UV_CACHE_DIR=/tmp/tutoring-platform-uv-cache", "uv", "run", "--project", "backend", "--offline", "--group", "test", "pytest", "backend/tests"],
         "timeout_seconds": 180,
         "required": true
       },
@@ -78,7 +78,7 @@
       },
       {
         "id": "critical-path-e2e",
-        "command": ["env", "UV_CACHE_DIR=/home/chrissannar/.cache/gauntlet/uv", "PLAYWRIGHT_BROWSERS_PATH=/home/chrissannar/.cache/gauntlet/playwright", "bun", "run", "e2e"],
+        "command": ["bun", "run", "test:e2e"],
         "timeout_seconds": 300,
         "required": true
       }

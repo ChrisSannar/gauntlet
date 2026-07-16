@@ -21,6 +21,7 @@ from controller.gauntlet_controller import (
     pin_remote,
     today_view,
     validate_run,
+    verification_repair,
 )
 
 
@@ -232,6 +233,29 @@ class ControllerTests(unittest.TestCase):
             path.write_text(json.dumps({"status": "freezing"}))
             with self.assertRaisesRegex(ControllerError, "original cutoff freeze is incomplete"):
                 establish_freeze(config, dt.date(2026, 7, 15), state)
+
+    def test_verification_repair_allows_only_command_changes(self) -> None:
+        frozen = json.loads((ROOT / "templates" / "run.json").read_text())
+        operational = json.loads(json.dumps(frozen))
+        operational["verification"]["commands"] = [
+            {"id": "tests", "command": ["python", "-m", "pytest"]}
+        ]
+
+        repair = verification_repair(frozen, operational)
+
+        self.assertEqual(repair["kind"], "verification-commands-only")
+        self.assertNotEqual(repair["frozen_config_sha256"], repair["operational_config_sha256"])
+
+    def test_verification_repair_rejects_broader_changes(self) -> None:
+        frozen = json.loads((ROOT / "templates" / "run.json").read_text())
+        operational = json.loads(json.dumps(frozen))
+        operational["verification"]["commands"] = [
+            {"id": "tests", "command": ["python", "-m", "pytest"]}
+        ]
+        operational["schedule"]["end_date"] = "2026-08-01"
+
+        with self.assertRaisesRegex(ControllerError, "differs from frozen"):
+            verification_repair(frozen, operational)
 
     def test_cron_has_midnight_and_two_retries(self) -> None:
         config_path = ROOT / "runs" / "2026-07-15-tutoring-platform" / "run.json"

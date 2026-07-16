@@ -34,6 +34,12 @@ Evidence is read from detached frozen commits. Controller reports are committed 
 of the then-current ledger head, preserving post-cutoff work while excluding it from the
 grade. A matching finalized report makes every retry a no-op.
 
+If a frozen verification command is operationally wrong, manual recovery may replace
+only `verification.commands`. The controller rejects every broader configuration
+change, continues to test the original frozen product and ledger SHAs, and records the
+original commands, replacement commands, and both configuration hashes in evidence.
+Automatic retries never opt into this recovery path.
+
 ## Adapter protocol
 
 Every adapter is an executable command represented as an argument array. The controller

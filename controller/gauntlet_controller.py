@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as dt
 import hashlib
 import json
@@ -395,7 +396,37 @@ def ensure_cutoff_reached(config: dict[str, Any], day: dt.date, now: dt.datetime
         raise ControllerError(f"cutoff has not been reached for {day}")
 
 
-def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any]:
+def verification_repair(
+    frozen: dict[str, Any], bootstrap: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Return an auditable commands-only repair, or reject a broader contract change."""
+    if sha256_value(frozen) == sha256_value(bootstrap):
+        return None
+
+    frozen_without_commands = copy.deepcopy(frozen)
+    bootstrap_without_commands = copy.deepcopy(bootstrap)
+    frozen_commands = frozen_without_commands["verification"].pop("commands")
+    bootstrap_commands = bootstrap_without_commands["verification"].pop("commands")
+    if sha256_value(frozen_without_commands) != sha256_value(bootstrap_without_commands):
+        raise ControllerError("bootstrap configuration differs from frozen ledger configuration")
+    if frozen_commands == bootstrap_commands:
+        raise ControllerError("bootstrap configuration differs from frozen ledger configuration")
+    return {
+        "kind": "verification-commands-only",
+        "frozen_config_sha256": sha256_value(frozen),
+        "operational_config_sha256": sha256_value(bootstrap),
+        "original_commands": frozen_commands,
+        "replacement_commands": bootstrap_commands,
+    }
+
+
+def close_day(
+    config_path: Path,
+    day: dt.date,
+    state_dir: Path,
+    *,
+    allow_verification_repair: bool = False,
+) -> dict[str, Any]:
     bootstrap = read_json(config_path)
     validate_run(bootstrap, operational=True)
     if not date_in_run(bootstrap, day):
@@ -440,8 +471,15 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
         ledger_config_path = frozen_ledger / "runs" / bootstrap["run_id"] / "run.json"
         config = read_json(ledger_config_path)
         validate_run(config, operational=True)
-        if sha256_value(config) != sha256_value(bootstrap):
-            raise ControllerError("bootstrap configuration differs from frozen ledger configuration")
+        repair = verification_repair(config, bootstrap)
+        if repair is not None and not allow_verification_repair:
+            raise ControllerError(
+                "verification commands differ from frozen configuration; "
+                "manual recovery requires --allow-verification-repair"
+            )
+        verification_commands = (
+            bootstrap["verification"]["commands"] if repair is not None else config["verification"]["commands"]
+        )
 
         frozen_day_dir = frozen_ledger / "runs" / config["run_id"] / "days" / day.isoformat()
         day_dir = output_day_dir
@@ -451,7 +489,7 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
         mastery = mastery_path.read_text() if mastery_path.exists() else ""
         rubric = read_required(frozen_ledger / config["accountability"]["rubric_path"], "rubric")
         backlog = read_required(frozen_ledger / config["project"]["backlog_path"], "backlog")
-        checks = run_checks(config["verification"]["commands"], product, config["project"]["deployed_url"])
+        checks = run_checks(verification_commands, product, config["project"]["deployed_url"])
 
         browser_result: dict[str, Any] | None = None
         browser_config = config["verification"]["browser"]
@@ -476,6 +514,7 @@ def close_day(config_path: Path, day: dt.date, state_dir: Path) -> dict[str, Any
             "frozen_at": freeze["completed_at"],
             "freeze_initiated_at": freeze["initiated_at"],
             "run_config_sha256": sha256_value(config),
+            "verification_repair": repair,
             "ledger_sha": ledger_sha,
             "product_sha": product_sha,
             "plan": plan,
@@ -663,6 +702,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     close.add_argument("config", type=Path)
     close.add_argument("day", type=dt.date.fromisoformat)
     close.add_argument("--state-dir", type=Path, required=True)
+    close.add_argument("--allow-verification-repair", action="store_true")
 
     close_auto = subparsers.add_parser("close-auto")
     close_auto.add_argument("config", type=Path)
@@ -693,7 +733,18 @@ def main(argv: list[str] | None = None) -> int:
         elif args.operation == "pin":
             print(pin_remote(args.remote, args.branch))
         elif args.operation == "close-day":
-            print(json.dumps(close_day(args.config, args.day, args.state_dir), indent=2, sort_keys=True))
+            print(
+                json.dumps(
+                    close_day(
+                        args.config,
+                        args.day,
+                        args.state_dir,
+                        allow_verification_repair=args.allow_verification_repair,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
         elif args.operation == "close-auto":
             config = read_json(args.config)
             now = dt.datetime.now(dt.UTC)
