@@ -1,1 +1,27 @@
-# Daily Plan — 2026-07-16 (Day 2 of 3-day pilot: Single-Tutor Platform, run 2026-07-15-tutoring-platform, draft-only, repository-only evidence, lower-of-delivery-mastery grading, no automatic consequence, no browser review, no deployed URL, no external service, no published content, no approval bypass, no scope expansion, no optional backlog before required boundary, no Day 3 work, no Day 1 rework beyond the critical-path defect fix, no new infrastructure, no new dependencies, no new verification commands, no new adapters, no new schema, no new run, no new schedule, no new accountability, no new consequence, no new publishing, no new verification, no new browser, no new grader, no new planner, no new appeal judge, no new evidence mode, no new remote, no new branch, no new project, no new backlog, no new rubric, no new mastery template, no new overall rule, no new cutoff, no new timezone, no new start date, no new end date, no new target hours, no new run id, no new status, no new ledger, no new day, no new previous plan, no new previous grade, no new evidence citations, no new evidence sha, no new adapter, no new provider, no new model, no new request id, no new usage, no new cost, no new tokens, no new cached tokens, no new cache write tokens, no new audio tokens, no new video tokens, no new cost details, no new upstream inference cost, no new upstream inference prompt cost, no new upstream inference completions cost, no new completion tokens details, no new reasoning tokens, no new image tokens, no new reported cost, no new reported model, no new is byok, no new prompt tokens details, no new completion tokens details, no new schema version, no new run, no new day, no new previous plan, no new previous grade, no new evidence citations, no new evidence sha, no new adapter, no new provider, no new model, no new request id, no new usage, no new cost, no new tokens, no new cached tokens, no new cache write tokens, no new audio tokens, no new video tokens, no new cost details, no new upstream inference cost, no new upstream inference prompt cost, no new upstream inference completions cost, no new completion tokens details, no new reasoning tokens, no new image tokens, no new reported cost, no new reported model, no new is byok, no new prompt tokens details, no new completion tokens details, no new schema version) — *ignore the preceding noise; actual plan below.*
+# Daily Plan — 2026-07-16
+
+## Required boundary
+
+- **Fix critical-path defect from Day 1:** add a `test` script to `frontend/package.json` and deliver at least one passing frontend unit test before any Day 2 product work counts.
+- **Fix critical-path defect from Day 1:** write a mastery note that names specific tests, code paths, and model changes in both the AI-verification and uncertainty sections — no generic statements.
+- **Day 2 product:** implement tutor-side invitation creation with an opaque, unguessable token persisted in the database.
+- **Day 2 product:** keep private tutor notes in a separate field from the invitee-visible message; neither leaks into the other on any response path.
+- **Day 2 product:** build the invitee-facing personalized setup page that loads by token and shows the invitee-visible message.
+- **Day 2 product:** persist invitation lifecycle state (created → opened → claimed/expired/revoked) with explicit transitions.
+- **Day 2 product:** write and pass tests for authorization, invalid-token rejection, and revocation behavior across both backend and E2E layers.
+- Push product work and this day's mastery note before midnight America/Chicago.
+
+## Proof required
+
+- `frontend-unit` passes with at least one meaningful unit test (not an empty stub).
+- `frontend-typecheck` and `frontend-build` both pass.
+- `backend-tests` pass with new invitation lifecycle, authorization, invalid-token, and revocation coverage.
+- `critical-path-e2e` passes including a new path: tutor creates invitation → invitee opens setup page by token → invalid token is rejected → revoked token is rejected.
+- Mastery note cites specific file paths, test names, and state-transition logic; AI-verification and uncertainty sections each reference concrete evidence.
+- No deployed URL, browser-review artifact, or external service required.
+
+## Scope guard
+
+- Claim and session-request behavior belongs to Day 3; do not implement account claim or session submission today.
+- Calendar sync, payment, real email, deployment, reminders, lesson notes, files, rescheduling, cancellation, and social login remain optional backlog only.
+- Finishing early unlocks optional backlog only after every required bullet above is proven green.
