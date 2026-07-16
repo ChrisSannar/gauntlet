@@ -21,6 +21,7 @@ from controller.gauntlet_controller import (
     pin_remote,
     today_view,
     validate_run,
+    validate_plan_markdown,
     verification_repair,
 )
 
@@ -129,7 +130,7 @@ class ControllerTests(unittest.TestCase):
                 "if request['operation']=='grade-day':\n"
                 " json.dump({'delivery_score':4,'mastery_score':3,'confidence':'high','summary':'good'},sys.stdout)\n"
                 "elif request['operation']=='plan-day':\n"
-                " json.dump({'plan_markdown':'# Daily Plan — next\\n'},sys.stdout)\n"
+                " json.dump({'plan_markdown':'# Daily Plan — 2026-07-14\\n\\n## Required boundary\\n- Build it.\\n\\n## Proof required\\n- Test it.\\n\\n## Scope guard\\n- Stop here.\\n'},sys.stdout)\n"
                 "else:\n"
                 " raise SystemExit(2)\n"
             )
@@ -256,6 +257,25 @@ class ControllerTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ControllerError, "differs from frozen"):
             verification_repair(frozen, operational)
+
+    def test_daily_plan_requires_concrete_ordered_sections(self) -> None:
+        valid = """# Daily Plan — 2026-07-16
+
+## Required boundary
+- Build it.
+
+## Proof required
+- Run tests.
+
+## Scope guard
+- Stop here.
+"""
+        validate_plan_markdown(valid, dt.date(2026, 7, 16))
+        with self.assertRaisesRegex(ControllerError, "missing ordered required sections"):
+            validate_plan_markdown(
+                "# Daily Plan — 2026-07-16\n\n## Required boundary\n- Build it.\n",
+                dt.date(2026, 7, 16),
+            )
 
     def test_cron_has_midnight_and_two_retries(self) -> None:
         config_path = ROOT / "runs" / "2026-07-15-tutoring-platform" / "run.json"

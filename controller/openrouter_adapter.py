@@ -35,7 +35,14 @@ SCHEMAS: dict[str, dict[str, Any]] = {
         "type": "object",
         "additionalProperties": False,
         "required": ["plan_markdown"],
-        "properties": {"plan_markdown": {"type": "string", "minLength": 1}},
+        "properties": {
+            "plan_markdown": {
+                "type": "string",
+                "minLength": 120,
+                "maxLength": 8000,
+                "pattern": "^# Daily Plan[^\\n]*\\n[\\s\\S]*## Required boundary[\\s\\S]*## Proof required[\\s\\S]*## Scope guard",
+            }
+        },
     },
     "appeal": {
         "type": "object",
@@ -53,7 +60,13 @@ SCHEMAS: dict[str, dict[str, Any]] = {
 
 SYSTEM = {
     "grade-day": "Apply only the supplied rubric to the frozen evidence. Separate deterministic delivery facts from mastery judgment. Never award credit for missing evidence.",
-    "plan-day": "Create the next frozen daily boundary. Keep required work within the supplied run scope; prioritize critical-path defects before optional backlog work.",
+    "plan-day": (
+        "Create the next frozen daily boundary. Keep required work within the supplied run scope; "
+        "prioritize critical-path defects before optional backlog work. Return concise Markdown only "
+        "in plan_markdown, beginning with '# Daily Plan — YYYY-MM-DD' and containing, in order, "
+        "'## Required boundary', '## Proof required', and '## Scope guard'. Put concrete bullet items "
+        "under every section. Include no preamble, metadata dump, or instruction to ignore text."
+    ),
     "appeal": "Judge only the disputed claim against the original frozen evidence and rubric. New evidence is inadmissible.",
 }
 

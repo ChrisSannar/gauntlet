@@ -40,6 +40,11 @@ change, continues to test the original frozen product and ledger SHAs, and recor
 original commands, replacement commands, and both configuration hashes in evidence.
 Automatic retries never opt into this recovery path.
 
+Planner output is accepted only when it identifies the requested date and contains
+concrete, ordered `Required boundary`, `Proof required`, and `Scope guard` sections.
+Malformed output is `INFRA_ERROR`. A manual plan repair archives the rejected output,
+records its hash and replacement adapter metadata, and refuses to replace a valid plan.
+
 ## Adapter protocol
 
 Every adapter is an executable command represented as an argument array. The controller

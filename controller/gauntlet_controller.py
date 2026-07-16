@@ -420,6 +420,24 @@ def verification_repair(
     }
 
 
+def validate_plan_markdown(plan: str, day: dt.date) -> None:
+    required = ("## Required boundary", "## Proof required", "## Scope guard")
+    if len(plan) > 8000 or not plan.startswith("# Daily Plan"):
+        raise ControllerError("planner returned malformed daily plan heading")
+    if day.isoformat() not in plan.splitlines()[0]:
+        raise ControllerError("planner daily plan heading does not identify the requested day")
+    positions = [plan.find(heading) for heading in required]
+    if any(position < 0 for position in positions) or positions != sorted(positions):
+        raise ControllerError("planner daily plan is missing ordered required sections")
+    for index, position in enumerate(positions):
+        end = positions[index + 1] if index + 1 < len(positions) else len(plan)
+        body = plan[position + len(required[index]) : end]
+        if not any(line.lstrip().startswith(("- ", "1. ")) for line in body.splitlines()):
+            raise ControllerError(f"planner daily plan section has no concrete items: {required[index]}")
+    if "ignore the preceding" in plan.lower():
+        raise ControllerError("planner daily plan contains instruction-noise text")
+
+
 def close_day(
     config_path: Path,
     day: dt.date,
@@ -570,6 +588,7 @@ def close_day(
             plan_markdown = plan_response.get("plan_markdown")
             if not isinstance(plan_markdown, str) or not plan_markdown.strip():
                 raise ControllerError("planner response requires nonempty plan_markdown")
+            validate_plan_markdown(plan_markdown, next_day)
             next_dir = ledger / "runs" / config["run_id"] / "days" / next_day.isoformat()
             next_dir.mkdir(parents=True, exist_ok=True)
             if (next_dir / "plan.md").exists():
@@ -590,6 +609,78 @@ def close_day(
         git_output(["commit", "-m", f"gauntlet: finalize {config['run_id']} {day.isoformat()}"], cwd=ledger)
         git_output(["push", "origin", f"HEAD:refs/heads/{ledger_cfg['branch']}"], cwd=ledger, timeout=600)
         return {"status": "finalized", "evidence": evidence, "grade": grade}
+
+
+def repair_plan(config_path: Path, day: dt.date) -> dict[str, Any]:
+    config = read_json(config_path)
+    validate_run(config, operational=True)
+    if not date_in_run(config, day) or day == dt.date.fromisoformat(config["schedule"]["start_date"]):
+        raise ControllerError("plan repair requires a non-initial day inside the run")
+
+    ledger_cfg = config["ledger"]
+    with tempfile.TemporaryDirectory(prefix="gauntlet-plan-repair-") as temporary:
+        ledger = Path(temporary) / "ledger"
+        current_sha = pin_remote(ledger_cfg["remote"], ledger_cfg["branch"])
+        clone_branch(ledger_cfg["remote"], ledger_cfg["branch"], ledger, current_sha)
+        remote_config = read_json(ledger / "runs" / config["run_id"] / "run.json")
+        if sha256_value(remote_config) != sha256_value(config):
+            raise ControllerError("local and remote run configurations differ")
+
+        day_dir = ledger / "runs" / config["run_id"] / "days" / day.isoformat()
+        existing_plan_path = day_dir / "plan.md"
+        existing_plan = read_required(existing_plan_path, "daily plan")
+        try:
+            validate_plan_markdown(existing_plan, day)
+        except ControllerError:
+            pass
+        else:
+            raise ControllerError("daily plan is already structurally valid; refusing to replace it")
+
+        previous_day_dir = day_dir.parent / (day - dt.timedelta(days=1)).isoformat()
+        previous_evidence = read_json(previous_day_dir / "evidence.json")
+        previous_grade = read_json(previous_day_dir / "grade.json")
+        backlog = read_required(ledger / config["project"]["backlog_path"], "backlog")
+        response = invoke_adapter(
+            config["adapters"]["planner"],
+            {
+                "operation": "plan-day",
+                "run": config,
+                "day": day.isoformat(),
+                "previous_plan": previous_evidence["plan"],
+                "previous_grade": previous_grade,
+                "backlog": backlog,
+            },
+        )
+        adapter = response.pop("_adapter", None)
+        replacement = response.get("plan_markdown")
+        if not isinstance(replacement, str):
+            raise ControllerError("planner response requires nonempty plan_markdown")
+        validate_plan_markdown(replacement, day)
+
+        revisions = day_dir / "plan-revisions"
+        revisions.mkdir(parents=True, exist_ok=True)
+        archived = revisions / "01-invalid.md"
+        if archived.exists():
+            raise ControllerError("plan repair archive already exists")
+        archived.write_text(existing_plan)
+        existing_plan_path.write_text(replacement.rstrip() + "\n")
+        write_json(
+            day_dir / "plan-metadata.json",
+            {
+                "adapter": adapter,
+                "repair": {
+                    "kind": "malformed-planner-output",
+                    "replaced_plan_sha256": sha256_value(existing_plan),
+                },
+            },
+        )
+
+        git_output(["config", "user.name", "Gauntlet Controller"], cwd=ledger)
+        git_output(["config", "user.email", "controller@gauntlet.invalid"], cwd=ledger)
+        git_output(["add", f"runs/{config['run_id']}/days/{day.isoformat()}"], cwd=ledger)
+        git_output(["commit", "-m", f"gauntlet: repair plan {config['run_id']} {day.isoformat()}"], cwd=ledger)
+        git_output(["push", "origin", f"HEAD:refs/heads/{ledger_cfg['branch']}"], cwd=ledger, timeout=600)
+        return {"status": "repaired", "day": day.isoformat(), "adapter": adapter}
 
 
 def automatic_day(config: dict[str, Any], now: dt.datetime | None = None) -> dt.date:
@@ -708,6 +799,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     close_auto.add_argument("config", type=Path)
     close_auto.add_argument("--state-dir", type=Path, required=True)
 
+    repair = subparsers.add_parser("repair-plan")
+    repair.add_argument("config", type=Path)
+    repair.add_argument("day", type=dt.date.fromisoformat)
+
     cron = subparsers.add_parser("cron-lines")
     cron.add_argument("config", type=Path)
     cron.add_argument("--state-dir", type=Path, required=True)
@@ -757,6 +852,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(close_day(args.config, day, args.state_dir), indent=2, sort_keys=True))
             else:
                 print(f"no-op: {day} outside run")
+        elif args.operation == "repair-plan":
+            print(json.dumps(repair_plan(args.config, args.day), indent=2, sort_keys=True))
         elif args.operation == "cron-lines":
             print(cron_lines(args.config, args.state_dir), end="")
         elif args.operation == "today":
