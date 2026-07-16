@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gauntlet Grade"
+  short_description: "Freeze and grade today before the cutoff"
+  default_prompt: "Use $gauntlet-grade to submit and grade today’s active Gauntlet work."

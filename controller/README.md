@@ -1,6 +1,6 @@
 # Gauntlet Controller
 
-The controller is the provider-neutral, externally scheduled half of `$gauntlet`.
+The controller is the provider-neutral evidence and grading engine behind `$gauntlet-grade`.
 It treats the product repository as read-only and writes finalized evidence, grades,
 and next-day plans only to the configured Gauntlet ledger.
 
@@ -10,14 +10,13 @@ and next-day plans only to the configured Gauntlet ledger.
 python -m controller.gauntlet_controller validate <run.json>
 python -m controller.gauntlet_controller validate <run.json> --operational
 python -m controller.gauntlet_controller today <run.json>
-python -m controller.gauntlet_controller cron-lines <run.json> --state-dir <dir>
+python -m controller.gauntlet_controller submit-current <run.json> --state-dir <dir>
 python -m controller.gauntlet_controller close-day <run.json> YYYY-MM-DD --state-dir <dir>
-python -m controller.gauntlet_controller close-auto <run.json> --state-dir <dir>
 ```
 
-`cron-lines` prints, but does not install, the crontab entry. Installation is a separate
-explicit server action. `close-auto` grades the previous local date, allowing a midnight
-trigger to close the day that just ended.
+`submit-current` must first be called before the configured cutoff. It records a local
+receipt and freezes pushed repository heads immediately. After that receipt exists, the
+same command may finish or retry after the cutoff without admitting later commits.
 
 `today` is the learner-facing entry point. Before the run it previews Day 1; during the
 run it prints the frozen required boundary, proof requirements, mastery-note path,
@@ -30,7 +29,7 @@ diagnostic. The controller never converts them into a learner grade.
 
 ## Current minimum
 
-The close-day path atomically persists the first observed ledger and product SHAs before
+The submission path atomically persists the first observed ledger and product SHAs before
 checks or model calls. Retries reuse that freeze, read evidence from detached frozen
 commits, and append output on top of the current ledger head. An incomplete original
 freeze is permanently `INFRA_ERROR`; a later push can never replace it.
@@ -41,5 +40,5 @@ checks may still launch a repository-local Playwright application. Checks marked
 learner failure.
 
 The controller host still needs Git credentials for the ledger, read access to the product, the
-configured LLM adapter executables/secrets, offline dependency caches, and cron. A run remains draft until its
+configured LLM adapter executables/secrets, and offline dependency caches. A run remains draft until its
 `PENDING` values are replaced and `status` becomes `active`.

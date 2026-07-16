@@ -9,7 +9,6 @@ import datetime as dt
 import hashlib
 import json
 import os
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -83,7 +82,14 @@ def validate_run(config: dict[str, Any], operational: bool = False) -> None:
         (project, ("name", "remote", "branch", "evidence_mode", "deployed_url", "backlog_path")),
         (
             schedule,
-            ("timezone", "start_date", "end_date", "cutoff_local_time", "target_focused_hours"),
+            (
+                "timezone",
+                "start_date",
+                "end_date",
+                "cutoff_local_time",
+                "target_focused_hours",
+                "grading_trigger",
+            ),
         ),
         (
             accountability,
@@ -103,6 +109,8 @@ def validate_run(config: dict[str, Any], operational: bool = False) -> None:
         raise ControllerError(f"invalid run date: {exc}") from exc
     if end < start:
         raise ControllerError("end_date precedes start_date")
+    if schedule["grading_trigger"] != "learner-before-cutoff":
+        raise ControllerError("unsupported schedule.grading_trigger")
     try:
         ZoneInfo(str(schedule["timezone"]))
     except ZoneInfoNotFoundError as exc:
@@ -352,6 +360,12 @@ def normalize_grade(response: dict[str, Any]) -> dict[str, Any]:
     for name, score in (("delivery_score", delivery), ("mastery_score", mastery)):
         if not 0 <= score <= 4 or score * 2 != int(score * 2):
             raise ControllerError(f"{name} must be 0..4 in 0.5 increments")
+    for field, minimum in (("strengths", 1), ("improvement_actions", 2), ("learning_directions", 1)):
+        value = response.get(field)
+        if not isinstance(value, list) or len(value) < minimum:
+            raise ControllerError(f"grader response requires at least {minimum} {field}")
+        if not all(isinstance(item, str) and item.strip() for item in value):
+            raise ControllerError(f"grader response {field} must contain nonempty strings")
     overall = min(delivery, mastery)
     normalized = dict(response)
     normalized.update(
@@ -368,6 +382,9 @@ def normalize_grade(response: dict[str, Any]) -> dict[str, Any]:
 def render_grade(grade: dict[str, Any], evidence: dict[str, Any]) -> str:
     confidence = grade.get("confidence", "unspecified")
     summary = grade.get("summary", "No summary supplied.")
+    strengths = "\n".join(f"- {item}" for item in grade["strengths"])
+    improvements = "\n".join(f"- {item}" for item in grade["improvement_actions"])
+    learning = "\n".join(f"- {item}" for item in grade["learning_directions"])
     return (
         f"# Daily Grade — {evidence['day']}\n\n"
         f"- Delivery: {grade['delivery_score']}/4\n"
@@ -376,7 +393,10 @@ def render_grade(grade: dict[str, Any], evidence: dict[str, Any]) -> str:
         f"- Confidence: {confidence}\n"
         f"- Product SHA: `{evidence['product_sha']}`\n"
         f"- Ledger SHA: `{evidence['ledger_sha']}`\n\n"
-        f"## Summary\n\n{summary}\n"
+        f"## Summary\n\n{summary}\n\n"
+        f"## What worked\n\n{strengths}\n\n"
+        f"## Highest-leverage improvements\n\n{improvements}\n\n"
+        f"## Learning directions\n\n{learning}\n"
     )
 
 
@@ -394,6 +414,68 @@ def ensure_cutoff_reached(config: dict[str, Any], day: dt.date, now: dt.datetime
     current = now.astimezone(timezone) if now else dt.datetime.now(timezone)
     if current < cutoff:
         raise ControllerError(f"cutoff has not been reached for {day}")
+
+
+def cutoff_for_day(config: dict[str, Any], day: dt.date) -> dt.datetime:
+    timezone = ZoneInfo(config["schedule"]["timezone"])
+    hour, minute = (int(part) for part in config["schedule"]["cutoff_local_time"].split(":"))
+    return dt.datetime.combine(day + dt.timedelta(days=1), dt.time(hour, minute), timezone)
+
+
+def submission_path(state_dir: Path, run_id: str, day: dt.date) -> Path:
+    return state_dir / run_id / "submissions" / f"{day.isoformat()}.json"
+
+
+def pending_submission(config: dict[str, Any], state_dir: Path) -> tuple[dt.date, dict[str, Any]] | None:
+    directory = state_dir / config["run_id"] / "submissions"
+    if not directory.exists():
+        return None
+    for path in sorted(directory.glob("*.json"), reverse=True):
+        receipt = read_json(path)
+        if receipt.get("status") != "finalized":
+            day = dt.date.fromisoformat(str(receipt["day"]))
+            return day, receipt
+    return None
+
+
+def start_manual_submission(
+    config: dict[str, Any], day: dt.date, state_dir: Path, now: dt.datetime
+) -> dict[str, Any]:
+    current = now.astimezone(ZoneInfo(config["schedule"]["timezone"]))
+    cutoff = cutoff_for_day(config, day)
+    if current >= cutoff:
+        raise ControllerError(
+            f"$gauntlet-grade was not invoked before the {cutoff.strftime('%Y-%m-%d %H:%M %Z')} cutoff"
+        )
+    path = submission_path(state_dir, config["run_id"], day)
+    receipt = {
+        "schema_version": 1,
+        "run_id": config["run_id"],
+        "day": day.isoformat(),
+        "status": "received",
+        "invoked_at": now.astimezone(dt.UTC).isoformat(),
+        "cutoff": cutoff.astimezone(dt.UTC).isoformat(),
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w") as handle:
+            json.dump(receipt, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+    except FileExistsError:
+        return read_json(path)
+
+    freeze = establish_freeze(config, day, state_dir, now)
+    receipt.update(
+        {
+            "status": "frozen",
+            "ledger_sha": freeze["ledger_sha"],
+            "product_sha": freeze["product_sha"],
+            "freeze_completed_at": freeze["completed_at"],
+        }
+    )
+    write_json(path, receipt)
+    return receipt
 
 
 def verification_repair(
@@ -444,12 +526,16 @@ def close_day(
     state_dir: Path,
     *,
     allow_verification_repair: bool = False,
+    submission: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bootstrap = read_json(config_path)
     validate_run(bootstrap, operational=True)
     if not date_in_run(bootstrap, day):
         raise ControllerError(f"{day} is outside configured run dates")
-    ensure_cutoff_reached(bootstrap, day)
+    if submission is None:
+        ensure_cutoff_reached(bootstrap, day)
+    elif submission.get("day") != day.isoformat() or submission.get("status") not in ("frozen", "finalized"):
+        raise ControllerError("manual submission receipt is invalid or incomplete")
 
     ledger_cfg = bootstrap["ledger"]
     product_cfg = bootstrap["project"]
@@ -533,6 +619,7 @@ def close_day(
             "freeze_initiated_at": freeze["initiated_at"],
             "run_config_sha256": sha256_value(config),
             "verification_repair": repair,
+            "submission": submission,
             "ledger_sha": ledger_sha,
             "product_sha": product_sha,
             "plan": plan,
@@ -611,6 +698,43 @@ def close_day(
         return {"status": "finalized", "evidence": evidence, "grade": grade}
 
 
+def submit_current(
+    config_path: Path, state_dir: Path, now: dt.datetime | None = None
+) -> dict[str, Any]:
+    config = read_json(config_path)
+    validate_run(config, operational=True)
+    current = now or dt.datetime.now(dt.UTC)
+    pending = pending_submission(config, state_dir)
+    if pending is not None:
+        day, receipt = pending
+        freeze = freeze_path(state_dir, config["run_id"], day)
+        if receipt.get("status") == "received":
+            if not freeze.exists() or read_json(freeze).get("status") != "frozen":
+                raise ControllerError("pre-cutoff submission freeze is incomplete; later heads are inadmissible")
+            frozen = read_json(freeze)
+            receipt.update(
+                {
+                    "status": "frozen",
+                    "ledger_sha": frozen["ledger_sha"],
+                    "product_sha": frozen["product_sha"],
+                    "freeze_completed_at": frozen["completed_at"],
+                }
+            )
+            write_json(submission_path(state_dir, config["run_id"], day), receipt)
+    else:
+        local_day = current.astimezone(ZoneInfo(config["schedule"]["timezone"])).date()
+        if not date_in_run(config, local_day):
+            raise ControllerError(f"{local_day} is outside configured run dates")
+        day = local_day
+        receipt = start_manual_submission(config, day, state_dir, current)
+
+    result = close_day(config_path, day, state_dir, submission=receipt)
+    receipt["status"] = "finalized"
+    receipt["finalized_at"] = dt.datetime.now(dt.UTC).isoformat()
+    write_json(submission_path(state_dir, config["run_id"], day), receipt)
+    return result
+
+
 def repair_plan(config_path: Path, day: dt.date) -> dict[str, Any]:
     config = read_json(config_path)
     validate_run(config, operational=True)
@@ -683,22 +807,6 @@ def repair_plan(config_path: Path, day: dt.date) -> dict[str, Any]:
         return {"status": "repaired", "day": day.isoformat(), "adapter": adapter}
 
 
-def automatic_day(config: dict[str, Any], now: dt.datetime | None = None) -> dt.date:
-    timezone = ZoneInfo(config["schedule"]["timezone"])
-    current = now.astimezone(timezone) if now else dt.datetime.now(timezone)
-    return current.date() - dt.timedelta(days=1)
-
-
-def automatic_freeze_window(config: dict[str, Any], now: dt.datetime | None = None) -> bool:
-    """Only the cutoff invocation may create a freeze; scheduled retries must reuse it."""
-    timezone = ZoneInfo(config["schedule"]["timezone"])
-    current = now.astimezone(timezone) if now else dt.datetime.now(timezone)
-    hour, minute = (int(part) for part in config["schedule"]["cutoff_local_time"].split(":"))
-    cutoff = current.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    elapsed = (current - cutoff).total_seconds()
-    return 0 <= elapsed < 300
-
-
 def today_view(
     config_path: Path, day: dt.date | None = None, now: dt.datetime | None = None
 ) -> str:
@@ -734,42 +842,13 @@ def today_view(
         f"Product: {config['project']['remote']} ({config['project']['branch']})\n"
         f"Mastery note: {mastery}\n\n"
         f"{plan}\n\n"
-        "# Before midnight\n\n"
+        "# Before cutoff\n\n"
         f"1. Commit and push product work to `{config['project']['branch']}`.\n"
         f"2. Complete `{mastery}` with concrete evidence.\n"
         f"3. Commit and push the mastery note to ledger `{config['ledger']['branch']}`.\n"
         "4. Confirm both working trees are clean and tracking their remote branch.\n"
-        "5. Stop at the boundary; grading and tomorrow's plan run automatically.\n"
+        "5. Run `$gauntlet-grade` before the cutoff; invocation freezes both pushed repositories immediately.\n"
     )
-
-
-def cron_lines(config_path: Path, state_dir: Path) -> str:
-    config = read_json(config_path)
-    validate_run(config)
-    hour, minute = config["schedule"]["cutoff_local_time"].split(":")
-    controller = Path(__file__).resolve()
-    lock = state_dir / f"{config['run_id']}.lock"
-    log = state_dir / f"{config['run_id']}.log"
-    quoted = [
-        shlex.quote(str(value))
-        for value in (
-            lock,
-            sys.executable,
-            controller,
-            "close-auto",
-            config_path.resolve(),
-            "--state-dir",
-            state_dir.resolve(),
-        )
-    ]
-    command = f"flock -n {' '.join(quoted)} >> {shlex.quote(str(log))} 2>&1"
-    times = [(int(minute), int(hour))]
-    cutoff = dt.datetime(2000, 1, 1, int(hour), int(minute))
-    for delay in (15, 30):
-        retry = cutoff + dt.timedelta(minutes=delay)
-        times.append((retry.minute, retry.hour))
-    entries = "".join(f"{entry_minute} {entry_hour} * * * {command}\n" for entry_minute, entry_hour in times)
-    return f"CRON_TZ={config['schedule']['timezone']}\n{entries}"
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -795,17 +874,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     close.add_argument("--state-dir", type=Path, required=True)
     close.add_argument("--allow-verification-repair", action="store_true")
 
-    close_auto = subparsers.add_parser("close-auto")
-    close_auto.add_argument("config", type=Path)
-    close_auto.add_argument("--state-dir", type=Path, required=True)
+    submit = subparsers.add_parser("submit-current")
+    submit.add_argument("config", type=Path)
+    submit.add_argument("--state-dir", type=Path, required=True)
 
     repair = subparsers.add_parser("repair-plan")
     repair.add_argument("config", type=Path)
     repair.add_argument("day", type=dt.date.fromisoformat)
-
-    cron = subparsers.add_parser("cron-lines")
-    cron.add_argument("config", type=Path)
-    cron.add_argument("--state-dir", type=Path, required=True)
 
     today = subparsers.add_parser("today")
     today.add_argument("config", type=Path)
@@ -840,22 +915,10 @@ def main(argv: list[str] | None = None) -> int:
                     sort_keys=True,
                 )
             )
-        elif args.operation == "close-auto":
-            config = read_json(args.config)
-            now = dt.datetime.now(dt.UTC)
-            day = automatic_day(config, now)
-            if date_in_run(config, day):
-                if not freeze_path(args.state_dir, config["run_id"], day).exists() and not automatic_freeze_window(
-                    config, now
-                ):
-                    raise ControllerError("original cutoff freeze is missing; retry cannot admit later heads")
-                print(json.dumps(close_day(args.config, day, args.state_dir), indent=2, sort_keys=True))
-            else:
-                print(f"no-op: {day} outside run")
+        elif args.operation == "submit-current":
+            print(json.dumps(submit_current(args.config, args.state_dir), indent=2, sort_keys=True))
         elif args.operation == "repair-plan":
             print(json.dumps(repair_plan(args.config, args.day), indent=2, sort_keys=True))
-        elif args.operation == "cron-lines":
-            print(cron_lines(args.config, args.state_dir), end="")
         elif args.operation == "today":
             print(today_view(args.config, args.day))
         return 0

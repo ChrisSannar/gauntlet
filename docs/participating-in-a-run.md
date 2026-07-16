@@ -29,25 +29,27 @@ prevents later-day or optional work from silently becoming required.
 ## Work
 
 Work in the product repository on `main`. Use the tests and local E2E as feedback, but
-the pushed product commit—not local uncommitted work—is eligible at midnight. Finishing
+the pushed product commit—not local uncommitted work—is eligible at submission. Finishing
 early does not expand today's required boundary.
 
 Record mastery evidence throughout the day in the exact `mastery.md` path printed by
 `today`. Explain system behavior, consequential decisions, investigated uncertainty,
 personal verification of AI output, and one transferable principle.
 
-## Submit before midnight
+## Submit before the cutoff
 
-There is no “submit” button and no manual grading request. Before the displayed cutoff:
+Before the displayed cutoff:
 
 1. Commit and push product work to product `main`.
 2. Complete, commit, and push the day's `mastery.md` to ledger `master`.
 3. Confirm both working trees are clean and tracking their remote branch.
+4. Invoke `$gauntlet-grade`.
 
-The controller freezes both remote SHAs at midnight, runs deterministic verification,
-grades Delivery and Mastery separately, commits the report to the ledger, and creates
-the next day's `plan.md` and `mastery.md`. Run `today` the next morning to receive it.
+Invocation immediately freezes both remote SHAs, so do it only after the day's eligible
+work is pushed. The controller runs deterministic verification, grades Delivery and
+Mastery separately, commits the report, and creates the next day's plan. Work pushed
+after invocation is not eligible even if it is still before midnight.
 
-If the midnight controller has an infrastructure failure, do not manufacture or edit a
-grade. Check `journalctl --user -u gauntlet-controller.service`; retries at 00:15 and
-00:30 may use only the original midnight freeze.
+If grading has an infrastructure failure, do not manufacture or edit a grade. Invoke
+`$gauntlet-grade` again. A retry after midnight is allowed only when the original
+pre-cutoff receipt and complete freeze exist, and it uses only those original SHAs.

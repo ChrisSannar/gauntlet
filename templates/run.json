@@ -19,7 +19,8 @@
     "start_date": "2026-01-01",
     "end_date": "2026-01-05",
     "cutoff_local_time": "00:00",
-    "target_focused_hours": 40
+    "target_focused_hours": 40,
+    "grading_trigger": "learner-before-cutoff"
   },
   "accountability": {
     "rubric_path": "docs/daily-grading-rubric.md",

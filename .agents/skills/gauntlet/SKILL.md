@@ -1,6 +1,6 @@
 ---
 name: gauntlet
-description: Configure and operate reusable, evidence-driven AI accountability runs with variable timelines, scope, hours, consequences, publishing policy, verification, and LLM adapters. Use when the user invokes /gauntlet or $gauntlet, starts a trial or full Gauntlet, requests a daily plan or midnight grade, manages an appeal, adjusts future difficulty, or evaluates a completed run.
+description: Configure and operate reusable, evidence-driven AI accountability runs with variable timelines, scope, hours, consequences, publishing policy, verification, and LLM adapters. Use when the user invokes /gauntlet or $gauntlet, starts a trial or full Gauntlet, requests a daily plan or pre-cutoff grade, manages an appeal, adjusts future difficulty, or evaluates a completed run.
 ---
 
 # Gauntlet
@@ -51,8 +51,8 @@ the smallest missing decision.
 2. Create `runs/<run-id>/run.json` and the first dated day folder.
 3. Freeze the first `plan.md` and copy the mastery template to `mastery.md`.
 4. Record the run configuration hash and controller version.
-5. Confirm the scheduler installation or clearly mark the run `NOT_AUTOMATED`. Do not
-   imply accountability is external when the learner must trigger grading manually.
+5. Confirm the configured grading trigger. For `learner-before-cutoff`, teach the learner
+   to invoke `$gauntlet-grade` only after both repositories are pushed.
 
 ### Plan
 
@@ -80,10 +80,11 @@ cannot grade, edit work, fill the mastery note, or renegotiate the boundary.
 
 ### Grade
 
-Midnight grading belongs to the external controller, not learner discretion.
+Use the repo-local `$gauntlet-grade` skill. Its invocation time is learner-controlled;
+the frozen evidence, deterministic checks, scoring, and persisted report are not.
 
-1. Pin the remote-reachable product SHA and Gauntlet evidence SHA at the configured
-   cutoff.
+1. Require first invocation before the cutoff and immediately pin the remote-reachable
+   product SHA and Gauntlet evidence SHA.
 2. Reject late, uncommitted, or unpushed evidence.
 3. Run deterministic checks and E2E before subjective judgment.
 4. Collect live-browser evidence when configured.
@@ -95,6 +96,9 @@ Midnight grading belongs to the external controller, not learner discretion.
    confidence, model, prompt, rubric, and controller versions.
 9. Append results; never overwrite finalized evidence or reports.
 10. Invoke the planner separately to freeze tomorrow's boundary.
+
+A complete pre-cutoff receipt permits the same grading transaction to finish or retry
+after midnight. Never admit later SHAs on retry.
 
 Do not commit, push, deploy, repair, or otherwise modify the graded product.
 

@@ -23,12 +23,16 @@ checks executed from the frozen product clone are eligible. A check marked
 `infrastructure: true` provisions the offline test environment; failure is
 `INFRA_ERROR`, not a delivery result.
 
-## Cutoff and retry contract
+## Submission, cutoff, and retry contract
 
-Before tests or adapters, the controller creates an exclusive local freeze record and
-pins ledger and product branch heads. The 00:15 and 00:30 retries reuse it. If the first
-attempt cannot complete both pins, the record remains incomplete and later heads are
-inadmissible. Losing or corrupting controller state is `INFRA_ERROR`.
+For `learner-before-cutoff` runs, the learner invokes `$gauntlet-grade` after pushing
+both repositories and before the displayed cutoff. The controller's first operational
+action records the invocation and immediately pins ledger and product branch heads.
+That invocation becomes the evidence cutoff even when time remains in the day.
+
+Once a complete pre-cutoff receipt and freeze exist, grading may finish or retry after
+the wall-clock cutoff. Every retry reuses the same SHAs. An incomplete freeze never
+admits later heads. Missing or corrupt controller state is `INFRA_ERROR`.
 
 Evidence is read from detached frozen commits. Controller reports are committed on top
 of the then-current ledger head, preserving post-cutoff work while excluding it from the
@@ -55,6 +59,10 @@ invalid JSON, or schema-invalid response is `INFRA_ERROR`.
 The command is model-neutral: it may call a local model, hosted API, agent CLI, or a
 test fixture. Secrets, including `OPENROUTER_API_KEY`, come from the controller environment and never from `run.json`,
 evidence bundles, prompts, or reports.
+
+The grader response must include evidence citations, concrete strengths, ordered
+improvement actions, and deliberate learning directions in addition to Delivery and
+Mastery scores. These fields are persisted in JSON and rendered in the daily report.
 
 ## Authority boundary
 

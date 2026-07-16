@@ -10,15 +10,15 @@ from pathlib import Path
 
 from controller.gauntlet_controller import (
     ControllerError,
-    automatic_day,
-    automatic_freeze_window,
     close_day,
-    cron_lines,
     establish_freeze,
     ensure_cutoff_reached,
     invoke_adapter,
     normalize_grade,
     pin_remote,
+    pending_submission,
+    start_manual_submission,
+    submit_current,
     today_view,
     validate_run,
     validate_plan_markdown,
@@ -91,6 +91,9 @@ class ControllerTests(unittest.TestCase):
                 "mastery_score": 2.5,
                 "overall_score": 4,
                 "overall_grade": "A",
+                "strengths": ["Passing checks."],
+                "improvement_actions": ["Add a negative test.", "Explain the state transition."],
+                "learning_directions": ["Trace one request and record each state change."],
             }
         )
         self.assertEqual(grade["overall_score"], 2.5)
@@ -98,7 +101,15 @@ class ControllerTests(unittest.TestCase):
 
     def test_scores_use_half_point_increments(self) -> None:
         with self.assertRaisesRegex(ControllerError, "0.5 increments"):
-            normalize_grade({"delivery_score": 3.2, "mastery_score": 3})
+            normalize_grade(
+                {
+                    "delivery_score": 3.2,
+                    "mastery_score": 3,
+                    "strengths": ["x"],
+                    "improvement_actions": ["x", "y"],
+                    "learning_directions": ["z"],
+                }
+            )
 
     def test_pin_remote_reads_branch_head(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -128,7 +139,7 @@ class ControllerTests(unittest.TestCase):
                 "import json,sys\n"
                 "request=json.load(sys.stdin)\n"
                 "if request['operation']=='grade-day':\n"
-                " json.dump({'delivery_score':4,'mastery_score':3,'confidence':'high','summary':'good'},sys.stdout)\n"
+                " json.dump({'delivery_score':4,'mastery_score':3,'confidence':'high','summary':'good','strengths':['works'],'improvement_actions':['add a failure test','explain the trace'],'learning_directions':['rebuild one path without AI']},sys.stdout)\n"
                 "elif request['operation']=='plan-day':\n"
                 " json.dump({'plan_markdown':'# Daily Plan — 2026-07-14\\n\\n## Required boundary\\n- Build it.\\n\\n## Proof required\\n- Test it.\\n\\n## Scope guard\\n- Stop here.\\n'},sys.stdout)\n"
                 "else:\n"
@@ -156,6 +167,7 @@ class ControllerTests(unittest.TestCase):
                     "end_date": "2026-07-14",
                     "cutoff_local_time": "00:00",
                     "target_focused_hours": 16,
+                    "grading_trigger": "learner-before-cutoff",
                 },
                 "accountability": {
                     "rubric_path": "docs/rubric.md",
@@ -200,9 +212,15 @@ class ControllerTests(unittest.TestCase):
             (ledger / "projects" / "test" / "BACKLOG.md").write_text("# Backlog\n")
             self.commit_and_push(ledger, "ledger")
 
-            result = close_day(ledger / "runs" / run_id / "run.json", dt.date(2026, 7, 13), root / "state")
+            result = submit_current(
+                ledger / "runs" / run_id / "run.json",
+                root / "state",
+                now=dt.datetime(2026, 7, 13, 23, tzinfo=dt.UTC),
+            )
             self.assertEqual(result["grade"]["overall_grade"], "B")
             self.assertEqual(result["evidence"]["product_sha"], product_sha)
+            self.assertEqual(result["evidence"]["submission"]["status"], "finalized")
+            self.assertIn("invoked_at", result["evidence"]["submission"])
 
             checkout = root / "ledger-check"
             subprocess.run(
@@ -234,6 +252,31 @@ class ControllerTests(unittest.TestCase):
             path.write_text(json.dumps({"status": "freezing"}))
             with self.assertRaisesRegex(ControllerError, "original cutoff freeze is incomplete"):
                 establish_freeze(config, dt.date(2026, 7, 15), state)
+
+    def test_pending_submission_prefers_unfinalized_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary)
+            config = json.loads((ROOT / "templates" / "run.json").read_text())
+            config["run_id"] = "receipt-test"
+            path = state / "receipt-test" / "submissions" / "2026-07-15.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({"day": "2026-07-15", "status": "frozen"}))
+
+            day, receipt = pending_submission(config, state)
+
+            self.assertEqual(day, dt.date(2026, 7, 15))
+            self.assertEqual(receipt["status"], "frozen")
+
+    def test_new_manual_submission_is_rejected_at_cutoff(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            config = json.loads((ROOT / "templates" / "run.json").read_text())
+            with self.assertRaisesRegex(ControllerError, "was not invoked before"):
+                start_manual_submission(
+                    config,
+                    dt.date(2026, 1, 1),
+                    Path(temporary),
+                    dt.datetime(2026, 1, 2, 6, 0, tzinfo=dt.UTC),
+                )
 
     def test_verification_repair_allows_only_command_changes(self) -> None:
         frozen = json.loads((ROOT / "templates" / "run.json").read_text())
@@ -277,27 +320,11 @@ class ControllerTests(unittest.TestCase):
                 dt.date(2026, 7, 16),
             )
 
-    def test_cron_has_midnight_and_two_retries(self) -> None:
-        config_path = ROOT / "runs" / "2026-07-15-tutoring-platform" / "run.json"
-        lines = cron_lines(config_path, Path("/tmp/gauntlet-state")).splitlines()
-        self.assertEqual(lines[0], "CRON_TZ=America/Chicago")
-        self.assertEqual([line.split()[:2] for line in lines[1:]], [["0", "0"], ["15", "0"], ["30", "0"]])
-
     def test_day_cannot_freeze_before_its_cutoff(self) -> None:
         config = json.loads((ROOT / "templates" / "run.json").read_text())
         now = dt.datetime(2026, 1, 1, 23, 59, tzinfo=dt.UTC)
         with self.assertRaisesRegex(ControllerError, "cutoff has not been reached"):
             ensure_cutoff_reached(config, dt.date(2026, 1, 1), now)
-
-    def test_automatic_day_is_previous_local_date(self) -> None:
-        config = json.loads((ROOT / "templates" / "run.json").read_text())
-        now = dt.datetime(2026, 7, 14, 5, 1, tzinfo=dt.UTC)
-        self.assertEqual(automatic_day(config, now), dt.date(2026, 7, 13))
-
-    def test_only_cutoff_attempt_can_create_automatic_freeze(self) -> None:
-        config = json.loads((ROOT / "templates" / "run.json").read_text())
-        self.assertTrue(automatic_freeze_window(config, dt.datetime(2026, 1, 2, 6, 2, tzinfo=dt.UTC)))
-        self.assertFalse(automatic_freeze_window(config, dt.datetime(2026, 1, 2, 6, 15, tzinfo=dt.UTC)))
 
     def test_today_previews_first_day_before_run(self) -> None:
         config_path = ROOT / "runs" / "2026-07-15-tutoring-platform" / "run.json"
@@ -305,7 +332,7 @@ class ControllerTests(unittest.TestCase):
         rendered = today_view(config_path, now=now)
         self.assertIn("Preview: Gauntlet Day 1", rendered)
         self.assertIn("Required boundary: Foundation", rendered)
-        self.assertIn("Before midnight", rendered)
+        self.assertIn("Before cutoff", rendered)
         self.assertIn("2026-07-16 00:00 CDT", rendered)
 
 

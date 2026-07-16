@@ -33,7 +33,13 @@ observable output. Use your own words and name the relevant code paths.
 ## AI contribution and personal verification
 
 State what AI tools produced or proposed, what you changed, and how you personally
-verified that the result is correct. Do not use "reviewed it" without naming the check.
+verified that the result is correct. Name the exact test, trace, query, or code path;
+state the failure it would catch and one check you performed without asking AI.
+
+## Deliberate practice
+
+Name one skill you intentionally practiced today. Describe the exercise, what was hard,
+the feedback you received from evidence, and what you will try differently next time.
 
 ## Calibration telemetry
 

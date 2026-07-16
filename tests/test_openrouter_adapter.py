@@ -39,6 +39,9 @@ class OpenRouterAdapterTests(unittest.TestCase):
                     "confidence": "high",
                     "summary": "fixture",
                     "evidence_citations": ["checks.unit"],
+                    "strengths": ["The unit check passes."],
+                    "improvement_actions": ["Add a failure-path test.", "Explain the state transition."],
+                    "learning_directions": ["Rebuild the path from memory and verify it with a trace."],
                 })}}],
                 "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15, "cost": 0.01},
             }

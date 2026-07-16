@@ -17,10 +17,10 @@ runs/<run-id>/
       decision-01.md
 ```
 
-Day 1's plan and mastery note are committed before launch. At midnight the controller
-freezes both remote SHAs, grades the completed note, and creates the next day's plan and
-mastery note. The learner completes and pushes `mastery.md` before midnight. It is never
-stored in or deployed with the product.
+Day 1's plan and mastery note are committed before launch. At the end of each workday,
+the learner invokes `$gauntlet-grade` before the cutoff. The controller records the
+invocation, freezes both remote SHAs, grades the completed note, and creates the next
+day's plan and mastery note. The note is never stored in or deployed with the product.
 
 The evidence bundle pins both the remote product commit and the Gauntlet repository
 commit containing the plan and mastery note. Controller-generated reports are

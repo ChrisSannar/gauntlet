@@ -22,13 +22,40 @@ SCHEMAS: dict[str, dict[str, Any]] = {
     "grade-day": {
         "type": "object",
         "additionalProperties": False,
-        "required": ["delivery_score", "mastery_score", "confidence", "summary", "evidence_citations"],
+        "required": [
+            "delivery_score",
+            "mastery_score",
+            "confidence",
+            "summary",
+            "evidence_citations",
+            "strengths",
+            "improvement_actions",
+            "learning_directions",
+        ],
         "properties": {
             "delivery_score": {"type": "number", "minimum": 0, "maximum": 4, "multipleOf": 0.5},
             "mastery_score": {"type": "number", "minimum": 0, "maximum": 4, "multipleOf": 0.5},
             "confidence": {"enum": ["low", "medium", "high"]},
             "summary": {"type": "string"},
             "evidence_citations": {"type": "array", "items": {"type": "string"}},
+            "strengths": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "items": {"type": "string", "minLength": 1},
+            },
+            "improvement_actions": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 5,
+                "items": {"type": "string", "minLength": 1},
+            },
+            "learning_directions": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {"type": "string", "minLength": 1},
+            },
         },
     },
     "plan-day": {
@@ -59,7 +86,12 @@ SCHEMAS: dict[str, dict[str, Any]] = {
 
 
 SYSTEM = {
-    "grade-day": "Apply only the supplied rubric to the frozen evidence. Separate deterministic delivery facts from mastery judgment. Never award credit for missing evidence.",
+    "grade-day": (
+        "Apply only the supplied rubric to the frozen evidence. Separate deterministic delivery facts "
+        "from mastery judgment. Never award credit for missing evidence. Cite concrete strengths, give "
+        "ordered actions that would raise the weaker score, and recommend deliberate learning practice "
+        "with an observable way for the learner to prove improvement."
+    ),
     "plan-day": (
         "Create the next frozen daily boundary. Keep required work within the supplied run scope; "
         "prioritize critical-path defects before optional backlog work. Return concise Markdown only "

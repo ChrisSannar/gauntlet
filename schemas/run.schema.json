@@ -60,7 +60,8 @@
         "start_date",
         "end_date",
         "cutoff_local_time",
-        "target_focused_hours"
+        "target_focused_hours",
+        "grading_trigger"
       ],
       "properties": {
         "timezone": { "type": "string", "minLength": 1 },
@@ -70,7 +71,8 @@
           "type": "string",
           "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
         },
-        "target_focused_hours": { "type": "number", "exclusiveMinimum": 0 }
+        "target_focused_hours": { "type": "number", "exclusiveMinimum": 0 },
+        "grading_trigger": { "const": "learner-before-cutoff" }
       }
     },
     "accountability": {
