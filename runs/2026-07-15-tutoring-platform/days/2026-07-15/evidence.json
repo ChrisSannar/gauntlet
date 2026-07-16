@@ -1,0 +1,326 @@
+{
+  "browser": null,
+  "checks": [
+    {
+      "command": [
+        "env",
+        "UV_CACHE_DIR=/tmp/tutoring-platform-uv-cache",
+        "uv",
+        "sync",
+        "--project",
+        "backend",
+        "--locked",
+        "--offline",
+        "--group",
+        "test"
+      ],
+      "duration_seconds": 0.248,
+      "exit_code": 0,
+      "id": "python-dependencies",
+      "passed": true,
+      "required": true,
+      "stderr": "Using CPython 3.12.8\nCreating virtual environment at: backend/.venv\nResolved 29 packages in 0.48ms\n   Building tutoring-platform-backend @ file:///tmp/gauntlet-close-t27m2qr6/product/backend\n      Built tutoring-platform-backend @ file:///tmp/gauntlet-close-t27m2qr6/product/backend\nPrepared 1 package in 201ms\nInstalled 28 packages in 2ms\n + alembic==1.18.5\n + annotated-types==0.7.0\n + anyio==4.14.2\n + certifi==2026.6.17\n + click==8.4.2\n + fastapi==0.116.2\n + greenlet==3.5.3\n + h11==0.16.0\n + httpcore==1.0.9\n + httpx==0.28.1\n + idna==3.18\n + iniconfig==2.3.0\n + mako==1.3.12\n + markupsafe==3.0.3\n + packaging==26.2\n + pluggy==1.6.0\n + pydantic==2.13.4\n + pydantic-core==2.46.4\n + pydantic-settings==2.14.2\n + pygments==2.20.0\n + pytest==8.4.2\n + python-dotenv==1.2.2\n + sqlalchemy==2.0.51\n + starlette==0.48.0\n + tutoring-platform-backend==0.1.0 (from file:///tmp/gauntlet-close-t27m2qr6/product/backend)\n + typing-extensions==4.16.0\n + typing-inspection==0.4.2\n + uvicorn==0.35.0\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "env",
+        "BUN_INSTALL_CACHE_DIR=/home/chrissannar/.cache/gauntlet/bun",
+        "bun",
+        "install",
+        "--frozen-lockfile",
+        "--offline"
+      ],
+      "duration_seconds": 0.084,
+      "exit_code": 0,
+      "id": "javascript-dependencies",
+      "passed": true,
+      "required": true,
+      "stderr": "",
+      "stdout": "bun install v1.3.9 (cf6cdbbb)\n\n+ @playwright/test@1.55.1\n\n136 packages installed [81.00ms]\n"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "--cwd",
+        "frontend",
+        "build"
+      ],
+      "duration_seconds": 1.982,
+      "exit_code": 0,
+      "id": "frontend-typecheck",
+      "passed": true,
+      "required": true,
+      "stderr": "$ tsc -b && vite build\n",
+      "stdout": "vite v6.1.0 building for production...\ntransforming...\n\u2713 38 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.52 kB \u2502 gzip:  0.33 kB\ndist/assets/index-C4hpyUY7.css    3.43 kB \u2502 gzip:  1.29 kB\ndist/assets/index-CzpJzmLV.js   197.93 kB \u2502 gzip: 61.63 kB\n\u2713 built in 698ms\n"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "--cwd",
+        "frontend",
+        "test"
+      ],
+      "duration_seconds": 0.002,
+      "exit_code": 1,
+      "id": "frontend-unit",
+      "passed": false,
+      "required": true,
+      "stderr": "error: \"/usr/bin/test\" exited with code 1\nnote: a package.json script \"test\" was not found\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "env",
+        "UV_CACHE_DIR=/tmp/tutoring-platform-uv-cache",
+        "uv",
+        "run",
+        "--project",
+        "backend",
+        "--offline",
+        "--group",
+        "test",
+        "pytest",
+        "backend/tests"
+      ],
+      "duration_seconds": 16.205,
+      "exit_code": 0,
+      "id": "backend-tests",
+      "passed": true,
+      "required": true,
+      "stderr": "",
+      "stdout": "============================= test session starts ==============================\nplatform linux -- Python 3.12.8, pytest-8.4.2, pluggy-1.6.0\nrootdir: /tmp/gauntlet-close-t27m2qr6/product/backend\nconfigfile: pyproject.toml\nplugins: anyio-4.14.2\ncollected 62 items\n\nbackend/tests/test_authentication.py ............                        [ 19%]\nbackend/tests/test_configuration.py ..                                   [ 22%]\nbackend/tests/test_errors.py .                                           [ 24%]\nbackend/tests/test_invitation_claim.py .......                           [ 35%]\nbackend/tests/test_invitations.py .................                      [ 62%]\nbackend/tests/test_pilot_data_deletion.py ....                           [ 69%]\nbackend/tests/test_readiness.py ...                                      [ 74%]\nbackend/tests/test_session_requests.py ................                  [100%]\n\n=============================== warnings summary ===============================\ntests/test_authentication.py: 122 warnings\ntests/test_invitation_claim.py: 145 warnings\ntests/test_invitations.py: 216 warnings\ntests/test_pilot_data_deletion.py: 129 warnings\ntests/test_session_requests.py: 221 warnings\n  /tmp/gauntlet-close-t27m2qr6/product/backend/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:952: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes\n    cursor.execute(statement, parameters)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n====================== 62 passed, 833 warnings in 15.21s =======================\n"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "duration_seconds": 1.739,
+      "exit_code": 0,
+      "id": "frontend-build",
+      "passed": true,
+      "required": true,
+      "stderr": "$ bun run --cwd frontend build\n$ tsc -b && vite build\n",
+      "stdout": "vite v6.1.0 building for production...\ntransforming...\n\u2713 38 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.52 kB \u2502 gzip:  0.33 kB\ndist/assets/index-C4hpyUY7.css    3.43 kB \u2502 gzip:  1.29 kB\ndist/assets/index-CzpJzmLV.js   197.93 kB \u2502 gzip: 61.63 kB\n\u2713 built in 1.26s\n"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "test:e2e"
+      ],
+      "duration_seconds": 11.304,
+      "exit_code": 0,
+      "id": "critical-path-e2e",
+      "passed": true,
+      "required": true,
+      "stderr": "$ bash e2e/run.sh\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22m\u001b[0m\u001b[2m\u001b[35m$\u001b[0m \u001b[2m\u001b[1mUV_CACHE_DIR=/tmp/tutoring-platform-uv-cache uv run --project backend uvicorn app.main:app --host 127.0.0.1 --port 7311 --no-access-log\u001b[0m\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22mINFO:     Started server process [1975422]\n\u001b[2m[WebServer] \u001b[22mINFO:     Waiting for application startup.\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22mINFO:     Application startup complete.\n\u001b[2m[WebServer] \u001b[22mINFO:     Uvicorn running on http://127.0.0.1:7311 (Press CTRL+C to quit)\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22m\u001b[0m\u001b[2m\u001b[35m$\u001b[0m \u001b[2m\u001b[1mbun run --cwd frontend build && bun run --cwd frontend preview --host 127.0.0.1 --port 7310\u001b[0m\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22m\u001b[0m\u001b[2m\u001b[35m$\u001b[0m \u001b[2m\u001b[1mtsc -b && vite build\u001b[0m\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22m(node:1975426) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.\n\u001b[2m[WebServer] \u001b[22m(Use `node --trace-warnings ...` to show where the warning was created)\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22m\u001b[0m\u001b[2m\u001b[35m$\u001b[0m \u001b[2m\u001b[1mvite preview --host \"127.0.0.1\" --port \"7310\"\u001b[0m\n\u001b[1A\u001b[2K\u001b[2m[WebServer] \u001b[22m(node:1975458) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.\n\u001b[2m[WebServer] \u001b[22m(Use `node --trace-warnings ...` to show where the warning was created)\n",
+      "stdout": "Tutor created for tutor@example.com\n\n\n\n\n\n\n\n\n\nRunning 10 tests using 1 worker\n\n\u001b[1A\u001b[2K[1/10] e2e/invitation-claim.spec.ts:3:5 \u203a Invitee confirms an Invitation Claim and continues as a Student\n\u001b[1A\u001b[2K[2/10] e2e/pilot-data-deletion.spec.ts:3:5 \u203a Tutor deliberately deletes collected Student pilot data\n\u001b[1A\u001b[2K[3/10] e2e/public-application.spec.ts:3:5 \u203a Prospect can view the Tutor landing page while the service is live\n\u001b[1A\u001b[2K[4/10] e2e/public-application.spec.ts:18:5 \u203a public pages apply the browser security baseline\n\u001b[1A\u001b[2K[5/10] e2e/public-application.spec.ts:33:5 \u203a service is ready on an isolated migrated schema\n\u001b[1A\u001b[2K[6/10] e2e/tutor-authentication.spec.ts:3:5 \u203a Tutor signs in through the development outbox and logs out\n\u001b[1A\u001b[2K[7/10] e2e/tutor-authentication.spec.ts:35:5 \u203a Tutor creates and activates a personalized Invitation\n\u001b[1A\u001b[2K[8/10] e2e/tutor-authentication.spec.ts:61:5 \u203a Invitee opens a personalized setup page without the Private Tutor Note\n\u001b[1A\u001b[2K[9/10] e2e/tutor-authentication.spec.ts:94:5 \u203a Tutor corrects an active Invitation email\n\u001b[1A\u001b[2K[10/10] e2e/tutor-authentication.spec.ts:116:5 \u203a Tutor regenerates and revokes an active Invitation\n\u001b[1A\u001b[2K  10 passed (9.3s)\n"
+    }
+  ],
+  "day": "2026-07-15",
+  "freeze_initiated_at": "2026-07-16T05:00:01.713759+00:00",
+  "frozen_at": "2026-07-16T05:00:03.201357+00:00",
+  "ledger_sha": "6e727d76e4550b2e51d94d153c9ced8f40760e1c",
+  "mastery_note": "# Daily Mastery Note \u2014 2026-07-15\n\nComplete and push before midnight. Be specific; activity logs are not mastery evidence.\n\n## System model\n\nWhat important behavior did you implement, and how does data/control move through it?\n\n  The basic vertial implementation of running the application. Particularly the data flowing through the application starts with a tutor generating a link to share with a student, where then the student can recieve a link to set up a profile. No acutal implementation of content has happened, but the student can now access a personalized account on the website. Everything is only running on localhost and can be deployed tomorrow.\n\n## Consequential decision\n\nWhat tradeoff did you make? What alternative did you reject and why?\n\n  A trade off in particular I've made is using Python for the backend instead of a language I'm more comfortable with like Go or Typescript. I need to expand my experience working with other languages so I have different perspectives\n\n## Uncertainty investigated\n\nWhat did you initially not understand? What evidence changed your model?\n\n  Mostly how FastAPI/Python normally works, but as I've been working at it I can see what it's doing.\n\n## AI verification\n\nWhat AI-generated work did you personally verify? Name exact tests, traces, queries, or code paths and what failure each check would catch.\n\n  Gotta be honest, I haven't checked as much of the actual code than I have just done E2E testing and verifying the results. I have asked the AI to modularize the code a bit more so it's easier to undertsand, but generally it's not been well understood\n\n\n## Transfer\n\nState one principle or failure mode from today that applies beyond this exact codebase.\n\n  I haven't used this type of authentication method before, with the magic links sen't via email, but it seems like it could be useful in other applications I could develop.\n",
+  "mastery_note_present": true,
+  "plan": "# Daily Plan \u2014 2026-07-15\n\n## Required boundary: Foundation\n\n- Complete and record the accountability preflight before product work counts.\n- Establish the React/TypeScript/Bun/Vite frontend and FastAPI/SQLite backend.\n- Deliver a tested public landing page and `GET /api/health`.\n- Make the repository-local Playwright harness start both layers from a clean checkout.\n- Push product work and this day's mastery note before midnight America/Chicago.\n\n## Proof required\n\n- Frontend typecheck, unit test, and production build.\n- Backend unit/integration tests.\n- A local Playwright smoke path launched from repository commands.\n- No deployed URL, browser-review artifact, or external service.\n\n## Scope guard\n\nInvitation behavior belongs to Day 2. Claim and session-request behavior belongs to\nDay 3. Finishing early unlocks optional backlog only after this boundary is proven.\n",
+  "product_sha": "b4d15251fab499349f5c2a04e180eb694a602425",
+  "run_config_sha256": "98065f0cad1aed36d8267c5ea5530682a8a9342de25e4c2f9ee2270024463ead",
+  "run_id": "2026-07-15-tutoring-platform",
+  "schema_version": 1,
+  "verification_repair": {
+    "frozen_config_sha256": "98065f0cad1aed36d8267c5ea5530682a8a9342de25e4c2f9ee2270024463ead",
+    "kind": "verification-commands-only",
+    "operational_config_sha256": "1da338cef873567599fad31d3e7c03aaaa6cfaa10c66ac18dd40b486dce3ae11",
+    "original_commands": [
+      {
+        "command": [
+          "env",
+          "UV_CACHE_DIR=/home/chrissannar/.cache/gauntlet/uv",
+          "uv",
+          "sync",
+          "--frozen",
+          "--offline",
+          "--all-extras"
+        ],
+        "id": "python-dependencies",
+        "infrastructure": true,
+        "required": true,
+        "timeout_seconds": 300
+      },
+      {
+        "command": [
+          "env",
+          "BUN_INSTALL_CACHE_DIR=/home/chrissannar/.cache/gauntlet/bun",
+          "bun",
+          "install",
+          "--frozen-lockfile",
+          "--offline"
+        ],
+        "id": "javascript-dependencies",
+        "infrastructure": true,
+        "required": true,
+        "timeout_seconds": 300
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "typecheck"
+        ],
+        "id": "frontend-typecheck",
+        "required": true,
+        "timeout_seconds": 120
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "test"
+        ],
+        "id": "frontend-unit",
+        "required": true,
+        "timeout_seconds": 120
+      },
+      {
+        "command": [
+          "env",
+          "UV_CACHE_DIR=/home/chrissannar/.cache/gauntlet/uv",
+          "uv",
+          "run",
+          "--offline",
+          "--extra",
+          "test",
+          "pytest"
+        ],
+        "id": "backend-tests",
+        "required": true,
+        "timeout_seconds": 180
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "build"
+        ],
+        "id": "frontend-build",
+        "required": true,
+        "timeout_seconds": 180
+      },
+      {
+        "command": [
+          "env",
+          "UV_CACHE_DIR=/home/chrissannar/.cache/gauntlet/uv",
+          "PLAYWRIGHT_BROWSERS_PATH=/home/chrissannar/.cache/gauntlet/playwright",
+          "bun",
+          "run",
+          "e2e"
+        ],
+        "id": "critical-path-e2e",
+        "required": true,
+        "timeout_seconds": 300
+      }
+    ],
+    "replacement_commands": [
+      {
+        "command": [
+          "env",
+          "UV_CACHE_DIR=/tmp/tutoring-platform-uv-cache",
+          "uv",
+          "sync",
+          "--project",
+          "backend",
+          "--locked",
+          "--offline",
+          "--group",
+          "test"
+        ],
+        "id": "python-dependencies",
+        "infrastructure": true,
+        "required": true,
+        "timeout_seconds": 300
+      },
+      {
+        "command": [
+          "env",
+          "BUN_INSTALL_CACHE_DIR=/home/chrissannar/.cache/gauntlet/bun",
+          "bun",
+          "install",
+          "--frozen-lockfile",
+          "--offline"
+        ],
+        "id": "javascript-dependencies",
+        "infrastructure": true,
+        "required": true,
+        "timeout_seconds": 300
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "--cwd",
+          "frontend",
+          "build"
+        ],
+        "id": "frontend-typecheck",
+        "required": true,
+        "timeout_seconds": 120
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "--cwd",
+          "frontend",
+          "test"
+        ],
+        "id": "frontend-unit",
+        "required": true,
+        "timeout_seconds": 120
+      },
+      {
+        "command": [
+          "env",
+          "UV_CACHE_DIR=/tmp/tutoring-platform-uv-cache",
+          "uv",
+          "run",
+          "--project",
+          "backend",
+          "--offline",
+          "--group",
+          "test",
+          "pytest",
+          "backend/tests"
+        ],
+        "id": "backend-tests",
+        "required": true,
+        "timeout_seconds": 180
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "build"
+        ],
+        "id": "frontend-build",
+        "required": true,
+        "timeout_seconds": 180
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "test:e2e"
+        ],
+        "id": "critical-path-e2e",
+        "required": true,
+        "timeout_seconds": 300
+      }
+    ]
+  }
+}

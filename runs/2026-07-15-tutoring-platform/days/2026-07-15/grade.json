@@ -1,0 +1,51 @@
+{
+  "adapter": {
+    "provider": "openrouter",
+    "reported_cost": 0.01826583,
+    "reported_model": "z-ai/glm-5.2",
+    "request_id": "gen-1784224149-ignKz5UektFyFeIEYqij",
+    "requested_model": "z-ai/glm-5.2",
+    "usage": {
+      "completion_tokens": 2231,
+      "completion_tokens_details": {
+        "audio_tokens": 0,
+        "image_tokens": 0,
+        "reasoning_tokens": 2209
+      },
+      "cost": 0.01826583,
+      "cost_details": {
+        "upstream_inference_completions_cost": 0.00858935,
+        "upstream_inference_cost": 0.01826583,
+        "upstream_inference_prompt_cost": 0.00967648
+      },
+      "is_byok": false,
+      "prompt_tokens": 5498,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cache_write_tokens": 0,
+        "cached_tokens": 0,
+        "video_tokens": 0
+      },
+      "total_tokens": 7729
+    }
+  },
+  "confidence": "high",
+  "day": "2026-07-15",
+  "delivery_score": 2.5,
+  "evidence_citations": [
+    "frontend-unit check: exit_code=1, stderr='error: \"/usr/bin/test\" exited with code 1 / note: a package.json script \"test\" was not found' \u2014 no frontend unit test script exists",
+    "backend-tests: 62 passed in 15.21s covering authentication, invitations, session requests, readiness, pilot data deletion",
+    "critical-path-e2e: 10 passed including 'Prospect can view the Tutor landing page while the service is live' and 'service is ready on an isolated migrated schema'",
+    "frontend-build: vite build succeeded, 38 modules transformed",
+    "frontend-typecheck: tsc -b && vite build succeeded",
+    "Mastery note AI verification: 'Gotta be honest, I haven't checked as much of the actual code than I have just done E2E testing and verifying the results.' \u2014 no specific tests, traces, or code paths named",
+    "Mastery note uncertainty: 'Mostly how FastAPI/Python normally works, but as I've been working at it I can see what it's doing.' \u2014 no specific evidence or model change described"
+  ],
+  "evidence_sha256": "fc609c7d21c0cad3c6cfed91d4e723266bce0ef29ec004086818365dce69f1bd",
+  "mastery_score": 1.5,
+  "overall_grade": "D",
+  "overall_score": 1.5,
+  "run_id": "2026-07-15-tutoring-platform",
+  "schema_version": 1,
+  "summary": "Most required outcomes are satisfied \u2014 backend tests pass (62), E2E smoke path passes (10 tests), frontend builds and typechecks \u2014 but the required frontend unit test proof is entirely absent (no test script in package.json). The mastery note contains some specific system-model content but the AI-verification and uncertainty sections are shallow or explicitly absent."
+}
